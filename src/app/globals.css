@@ -1,0 +1,293 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 97%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 208 71% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 145 58% 49%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 208 71% 53%;
+    --radius: 0.5rem;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 208 71% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 145 58% 49%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 208 71% 53%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  /* Ensure any contenteditable canvas never shows UA border/outline */
+  [contenteditable="true"] {
+    outline: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+@layer components {
+  /* Medium-like article polish */
+  .prose-medium {
+    @apply prose prose-lg max-w-3xl mx-auto;
+  }
+  .prose-medium p {
+    text-wrap: pretty;
+  }
+  .prose-medium figure > figcaption {
+    @apply mt-2 text-center text-sm text-muted-foreground;
+  }
+  .prose-medium .drop-cap:first-letter {
+    float: left;
+    font-size: 3.5rem;
+    line-height: 1;
+    padding-right: 0.25rem;
+    padding-top: 0.25rem;
+    font-family: Georgia, Cambria, 'Times New Roman', Times, serif;
+  }
+}
+
+/* Premium profile banners */
+@layer utilities {
+  /* Soft cards and pills for charming UI */
+  .soft-card {
+    @apply rounded-2xl border bg-card/80 backdrop-blur shadow-[0_1px_0_rgba(0,0,0,.02)];
+  }
+  .soft-pill {
+    @apply inline-flex items-center px-3 py-1 rounded-full border text-xs uppercase tracking-wide bg-white/70 dark:bg-white/10 hover:bg-white/90 dark:hover:bg-white/20 transition;
+  }
+  .soft-pill-active {
+    @apply bg-primary text-primary-foreground border-primary;
+  }
+  .quiz-hero {
+    background: radial-gradient(80% 120% at 10% 10%, rgba(255,255,255,0.18), transparent 60%),
+      radial-gradient(60% 120% at 90% 20%, rgba(255,255,255,0.12), transparent 60%),
+      linear-gradient(120deg, #0ea5e9, #6366f1);
+    @apply rounded-2xl p-5 md:p-7 shadow-md;
+  }
+  .banner-gradients {
+    background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+    background-size: 400% 400%;
+    animation: banner-gradient-shift 15s ease infinite;
+  }
+  @keyframes banner-gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .banner-stripes {
+    background:
+      linear-gradient(120deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)),
+      linear-gradient(120deg, rgba(0,0,0,0.15), transparent),
+      repeating-linear-gradient(45deg,
+        rgba(255,255,255,0.06) 0 12px,
+        transparent 12px 24px
+      ),
+      linear-gradient(135deg, #667eea, #764ba2);
+    background-size: 200% 200%, 200% 200%, 200% 200%, cover;
+    animation: banner-stripes-move 18s linear infinite;
+  }
+  @keyframes banner-stripes-move {
+    0% { background-position: 0% 0%, 0% 100%, 0% 0%, center; }
+    50% { background-position: 100% 100%, 100% 0%, 100% 100%, center; }
+    100% { background-position: 0% 0%, 0% 100%, 0% 0%, center; }
+  }
+
+  .banner-blobs {
+    background:
+      radial-gradient(120px 120px at 10% 20%, rgba(255,99,132,0.35), transparent 60%),
+      radial-gradient(140px 140px at 80% 0%, rgba(54,162,235,0.35), transparent 60%),
+      radial-gradient(160px 160px at 90% 80%, rgba(75,192,192,0.35), transparent 60%),
+      radial-gradient(140px 140px at 0% 100%, rgba(255,206,86,0.35), transparent 60%),
+      linear-gradient(135deg, #1f2937, #111827);
+    background-size: auto, auto, auto, auto, cover;
+    animation: banner-blobs-drift 22s ease-in-out infinite alternate;
+  }
+  @keyframes banner-blobs-drift {
+    0% { background-position: 10% 20%, 80% 0%, 90% 80%, 0% 100%, center; }
+    50% { background-position: 20% 30%, 70% 10%, 80% 70%, 10% 90%, center; }
+    100% { background-position: 15% 25%, 85% 5%, 95% 85%, 5% 95%, center; }
+  }
+
+  .banner-shine {
+    position: relative;
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    overflow: hidden;
+  }
+  .banner-shine::after {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%);
+    transform: rotate(20deg);
+    animation: banner-shine-sweep 6s linear infinite;
+  }
+  @keyframes banner-shine-sweep {
+    0% { transform: translateX(-50%) translateY(-50%) rotate(20deg); }
+    100% { transform: translateX(50%) translateY(50%) rotate(20deg); }
+  }
+
+  /* Cartoon-style banners */
+  .banner-popdots {
+    background:
+      radial-gradient(circle at 10% 20%, rgba(255,255,255,0.25) 2px, transparent 3px),
+      radial-gradient(circle at 30% 40%, rgba(255,255,255,0.18) 2px, transparent 3px),
+      radial-gradient(circle at 70% 60%, rgba(255,255,255,0.2) 2px, transparent 3px),
+      linear-gradient(135deg, #f43f5e, #fb923c, #f59e0b);
+    background-size: 24px 24px, 28px 28px, 22px 22px, cover;
+    animation: banner-dots-float 18s ease-in-out infinite alternate;
+  }
+  @keyframes banner-dots-float {
+    0% { background-position: 0% 0%, 20% 10%, 80% 20%, center; }
+    50% { background-position: 10% 20%, 30% 30%, 60% 40%, center; }
+    100% { background-position: 0% 10%, 10% 40%, 90% 10%, center; }
+  }
+
+  .banner-waves {
+    --c1: #34d399; /* emerald */
+    --c2: #22d3ee; /* cyan */
+    background:
+      radial-gradient(60% 60% at 50% 0%, rgba(255,255,255,0.12), transparent),
+      repeating-linear-gradient( to right,
+        rgba(255,255,255,0.12) 0 2px,
+        transparent 2px 16px
+      ),
+      linear-gradient(120deg, var(--c1), var(--c2));
+    position: relative;
+    overflow: hidden;
+  }
+  .banner-waves::before,
+  .banner-waves::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 140%;
+    background: radial-gradient(50% 40% at 50% 60%, rgba(255,255,255,0.18), transparent 60%);
+    animation: banner-waves-sway 16s ease-in-out infinite;
+  }
+  .banner-waves::after {
+    animation-duration: 22s;
+    opacity: 0.7;
+  }
+  @keyframes banner-waves-sway {
+    0% { transform: translateY(-10%) rotate(0deg); }
+    50% { transform: translateY(-6%) rotate(3deg); }
+    100% { transform: translateY(-10%) rotate(0deg); }
+  }
+
+  .banner-sparkles {
+    background: linear-gradient(135deg, #a78bfa, #f472b6);
+    position: relative;
+    overflow: hidden;
+  }
+  .banner-sparkles::before {
+    content: "";
+    position: absolute;
+    inset: -50% -50% auto auto;
+    width: 200%;
+    height: 200%;
+    background:
+      radial-gradient(circle, rgba(255,255,255,0.7) 2px, transparent 3px) 0 0/24px 24px,
+      radial-gradient(circle, rgba(255,255,255,0.4) 1px, transparent 3px) 12px 12px/36px 36px;
+    filter: blur(0.5px);
+    animation: banner-sparkles-move 14s linear infinite;
+  }
+  @keyframes banner-sparkles-move {
+    0% { transform: translate3d(-10%, -10%, 0) rotate(0deg); }
+    100% { transform: translate3d(10%, 10%, 0) rotate(360deg); }
+  }
+
+  .banner-clouds {
+    background: linear-gradient(180deg, #60a5fa, #3b82f6);
+    position: relative;
+    overflow: hidden;
+  }
+  .banner-clouds::before {
+    content: "";
+    position: absolute;
+    left: -20%;
+    right: -20%;
+    top: -30%;
+    bottom: -30%;
+    background:
+      radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.9) 0 25%, transparent 26%),
+      radial-gradient(ellipse at 60% 35%, rgba(255,255,255,0.85) 0 22%, transparent 23%),
+      radial-gradient(ellipse at 80% 30%, rgba(255,255,255,0.8) 0 18%, transparent 19%),
+      radial-gradient(ellipse at 40% 60%, rgba(255,255,255,0.85) 0 20%, transparent 21%);
+    background-size: 40% 40%, 38% 38%, 36% 36%, 42% 42%;
+    animation: banner-clouds-drift 28s linear infinite;
+    opacity: 0.9;
+  }
+  @keyframes banner-clouds-drift {
+    0% { transform: translateX(0%); }
+    100% { transform: translateX(-20%); }
+  }
+}
