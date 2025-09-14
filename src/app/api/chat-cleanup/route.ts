@@ -31,7 +31,16 @@ export async function POST(req: NextRequest) {
       groupsToCheck.push(groupId);
     } else {
       // Caution: scanning all groups; consider narrowing with scheduled known groups list
-  const groupsSnap = await db.collection('groups').select().limit(200).get();
+  let groupsQuery = db.collection('groups');
+  // Some fallback client Firestore instances may not support .select() (admin-only optimization)
+  if (typeof (groupsQuery as any).select === 'function') {
+    try {
+      groupsQuery = (groupsQuery as any).select();
+    } catch {
+      /* ignore */
+    }
+  }
+  const groupsSnap = await groupsQuery.limit(200).get();
   groupsSnap.forEach((g: any) => groupsToCheck.push(g.id));
     }
 

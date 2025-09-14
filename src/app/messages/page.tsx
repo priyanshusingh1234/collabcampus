@@ -25,6 +25,7 @@ import {
 import { db } from "@/lib/firebase";
 import Link from "next/link";
 import { ensureConversation, type BasicUser as BasicUserType } from "@/lib/chat";
+import { isPremium } from '@/lib/premium';
 
 type ConversationListItem = {
   id: string;
@@ -83,13 +84,13 @@ function MessagesInner() {
         if (cancelled) return;
         if (snap.exists()) {
           const u = snap.data() as any;
+          const prem = isPremium(u);
           setMeProfile({
             uid: meUid,
             username: u.username || (user as any)?.username || undefined,
             displayName: u.displayName || user?.displayName || (user as any)?.username || undefined,
             avatarUrl: u.avatarUrl || (user as any)?.photoURL || undefined,
-            // premium-related flags
-            isPremium: Boolean(u.isPremium || u.plan === 'pro' || u.subscription?.status === 'active' || u.role === 'premium'),
+            isPremium: prem,
             plan: u.plan ?? null,
             subscription: u.subscription ?? null,
             role: u.role ?? undefined,

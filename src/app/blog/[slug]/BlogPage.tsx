@@ -37,6 +37,9 @@ import { ReactionBar } from '@/components/ui/ReactionBar';
 import { resolveUserDocId } from '@/lib/utils';
 
 export default function BlogPage({ params }: { params: { slug: string } }) {
+  // Local premium helper (avoids build issue with external import path in this large client file)
+  // localIsPremium: runtime check; absent fields => false
+  const localIsPremium = (u: any) => !!(u && (u.isPremium === true || u?.subscription?.status === 'active'));
   const { slug } = params;
 
   const [blog, setBlog] = useState<any>(null);
@@ -442,7 +445,7 @@ export default function BlogPage({ params }: { params: { slug: string } }) {
                 {blog.username}
                 {author?.verified && <VerifiedTick size={14} />}
               </Link>
-              {author && (author.isPremium || author.plan === 'pro' || author.subscription?.status === 'active' || author.role === 'premium') && (
+              {author && localIsPremium(author) && (
                 <PremiumBadge href="/pricing" />
               )}
             </div>

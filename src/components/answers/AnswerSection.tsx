@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import DOMPurify from "dompurify"; // For sanitizing rich HTML answers
 import {
   collection,
   addDoc,
@@ -12,6 +13,8 @@ import {
   updateDoc,
   increment,
   doc,
+  setDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { notifyMentions } from "@/lib/notifications";
@@ -26,6 +29,8 @@ import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { getSuggestedTags } from "@/app/actions";
 import { MentionText } from "@/components/ui/MentionText";
+import { ArrowUpIcon, CheckBadgeIcon } from "@heroicons/react/24/solid";
+import RichTextEditor from "@/components/ui/rich-text";
 
 interface Answer {
   id: string;
@@ -33,6 +38,7 @@ interface Answer {
   createdAt?: any;
   upvotes?: number;
   accepted?: boolean;
+  hasUpvoted?: boolean;
   author: {
     uid: string;
     username: string;
@@ -41,15 +47,16 @@ interface Answer {
   };
 }
 
-export default function AnswerSection({ questionId }: { questionId: string }) {
+export default function AnswerSection({ questionId, questionTitle }: { questionId: string; questionTitle?: string }) {
   const auth = getAuth();
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
-  const [reply, setReply] = useState("");
+  const [replyHtml, setReplyHtml] = useState("");
   const [loading, setLoading] = useState(true);
   const [qAuthorUid, setQAuthorUid] = useState<string | null>(null);
   const [qAuthorUsername, setQAuthorUsername] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -61,12 +68,12 @@ export default function AnswerSection({ questionId }: { questionId: string }) {
   useEffect(() => {
     async function loadAnswers() {
       try {
-  // Load question to know author and slug
-  const qDocRef = doc(db, "questions", questionId);
-  const qSnap = await getDoc(qDocRef);
-  const qData = qSnap.data() as any;
-  setQAuthorUid(qData?.author?.id || null);
-  setQAuthorUsername(qData?.author?.username || null);
+        // Load question to know author and slug
+        const qDocRef = doc(db, "questions", questionId);
+        const qSnap = await getDoc(qDocRef);
+        const qData = qSnap.data() as any;
+        setQAuthorUid(qData?.author?.id || null);
+        setQAuthorUsername(qData?.author?.username || null);
 
         const answersRef = collection(db, "questions", questionId, "answers");
         const answerSnapshot = await getDocs(answersRef);
@@ -83,26 +90,42 @@ export default function AnswerSection({ questionId }: { questionId: string }) {
             const userSnap = await getDocs(userQuery);
             const user = userSnap.docs[0]?.data();
 
-      return {
+            let hasUpvoted = false;
+            if (currentUser) {
+              const voteRef = doc(
+                db,
+                "questions",
+                questionId,
+                "answers",
+                docSnap.id,
+                "votes",
+                currentUser.uid
+              );
+              const voteSnap = await getDoc(voteRef);
+              hasUpvoted = voteSnap.exists();
+            }
+
+            return {
               id: docSnap.id,
               text: answerData.text,
               upvotes: answerData.upvotes || 0,
               createdAt: answerData.createdAt,
-      accepted: !!answerData.accepted,
+              accepted: !!answerData.accepted,
+              hasUpvoted,
               author: {
                 uid: answerData.author.uid,
                 username: user?.username || "Anonymous",
                 avatarUrl:
                   user?.avatarUrl ||
                   `https://api.dicebear.com/8.x/initials/svg?seed=${user?.username || "U"}`,
-        verified: !!user?.verified,
+                verified: !!user?.verified,
               },
             } as Answer;
           })
         );
 
-    const list = (allAnswers.filter(Boolean) as Answer[]).sort((a, b) => (Number(!!b.accepted) - Number(!!a.accepted)) || ((b.upvotes || 0) - (a.upvotes || 0)));
-    setAnswers(list);
+        const list = (allAnswers.filter(Boolean) as Answer[]).sort((a, b) => (Number(!!b.accepted) - Number(!!a.accepted)) || ((b.upvotes || 0) - (a.upvotes || 0)));
+        setAnswers(list);
       } catch (err) {
         console.error("Failed to load answers:", err);
       } finally {
@@ -111,10 +134,12 @@ export default function AnswerSection({ questionId }: { questionId: string }) {
     }
 
     loadAnswers();
-  }, [questionId]);
+  }, [questionId, currentUser]);
 
   async function submitAnswer() {
-    if (!reply.trim() || !currentUser) return;
+    if (!replyHtml.trim() || !currentUser || isSubmitting) return;
+    
+    setIsSubmitting(true);
 
     // Fetch user profile to check blocked status
     try {
@@ -126,11 +151,12 @@ export default function AnswerSection({ questionId }: { questionId: string }) {
           title: "Account blocked",
           description: "You cannot post answers at this time.",
         });
+        setIsSubmitting(false);
         return;
       }
     } catch {}
 
-  try {
+    try {
       const userQuery = query(
         collection(db, "users"),
         where("uid", "==", currentUser.uid)
@@ -138,8 +164,8 @@ export default function AnswerSection({ questionId }: { questionId: string }) {
       const userSnap = await getDocs(userQuery);
       const user = userSnap.docs[0]?.data();
 
-    const newAnswer = {
-        text: reply,
+      const newAnswer = {
+        text: replyHtml.trim(),
         createdAt: serverTimestamp(),
         upvotes: 0,
         author: {
@@ -148,28 +174,28 @@ export default function AnswerSection({ questionId }: { questionId: string }) {
           avatarUrl:
             user?.avatarUrl ||
             `https://api.dicebear.com/8.x/initials/svg?seed=${user?.username || "U"}`,
-      verified: !!user?.verified,
+          verified: !!user?.verified,
         },
-  accepted: false,
+        accepted: false,
       };
 
-  const docRef = await addDoc(
+      const docRef = await addDoc(
         collection(db, "questions", questionId, "answers"),
         newAnswer
       );
 
       setAnswers((prev) => [
-  ...prev,
-  { ...newAnswer, id: docRef.id } as Answer,
+        ...prev,
+        { ...newAnswer, id: docRef.id, hasUpvoted: false } as Answer,
       ]);
-      setReply("");
+      setReplyHtml("");
 
       // AI tag suggestion and optional merge into question.tags
       try {
         const qSnap = await getDoc(doc(db, "questions", questionId));
         const qData = qSnap.data() as any;
         const baseTitle = qData?.title || '';
-  const suggestion = await getSuggestedTags({ text: `${baseTitle}\n\n${reply}`, kind: 'answer', maxTags: 5 });
+        const suggestion = await getSuggestedTags({ text: `${baseTitle}\n\n${replyHtml}`, kind: 'answer', maxTags: 5 });
         if (suggestion.tags && suggestion.tags.length > 0) {
           const confirmMerge = typeof window !== 'undefined' ? window.confirm(`Suggest tags for this thread: ${suggestion.tags.join(', ')}\n\nAdd to question tags?`) : false;
           if (confirmMerge) {
@@ -214,7 +240,7 @@ export default function AnswerSection({ questionId }: { questionId: string }) {
         const slug = qData?.slug as string | undefined;
         await notifyMentions({
           from: { uid: currentUser.uid, username: user?.username, avatarUrl: user?.avatarUrl },
-          text: reply,
+          text: replyHtml,
           title: `New answer on: ${qData?.title || "your question"}`,
           url: slug ? `/questions/${slug}` : `/questions/${questionId}`,
         });
@@ -222,8 +248,20 @@ export default function AnswerSection({ questionId }: { questionId: string }) {
         // non-fatal
         console.warn("notifyMentions(answer) failed", e);
       }
+
+      toast({
+        title: "Answer posted",
+        description: "Your answer has been successfully posted.",
+      });
     } catch (err) {
       console.error("Error posting answer:", err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to post your answer. Please try again.",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -255,7 +293,12 @@ export default function AnswerSection({ questionId }: { questionId: string }) {
         await updateDoc(ansRef, { accepted: false });
         // Remove points from answerer
         const userRef = await getUserDocRefByUid(current.author.uid);
-        if (userRef) await updateDoc(userRef, { "stats.reputation": ((current as any).stats?.reputation || 0) + 0 }); // keep idempotent, or optionally decrement
+        if (userRef) {
+          const uSnap = await getDocs(query(collection(db, "users"), where("uid", "==", current.author.uid)));
+          const uData = uSnap.docs[0]?.data() as any;
+          const curRep = Number(uData?.stats?.reputation || 0);
+          await updateDoc(userRef, { "stats.reputation": Math.max(0, curRep - 15) });
+        }
       } else {
         if (prevAccepted) {
           const prevRef = doc(db, "questions", questionId, "answers", prevAccepted.id);
@@ -290,116 +333,279 @@ export default function AnswerSection({ questionId }: { questionId: string }) {
         const next = prev.map(a => a.id === answerId ? { ...a, accepted: !alreadyAccepted } : (prevAccepted && a.id === prevAccepted.id ? { ...a, accepted: false } : a));
         return next.sort((a, b) => (Number(!!b.accepted) - Number(!!a.accepted)) || ((b.upvotes || 0) - (a.upvotes || 0)));
       });
+
+      toast({
+        title: alreadyAccepted ? "Answer unaccepted" : "Answer accepted",
+        description: alreadyAccepted 
+          ? "This answer is no longer marked as accepted." 
+          : "This answer is now marked as the solution.",
+      });
     } catch (e) {
       console.error("Failed to toggle accept:", e);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update answer status. Please try again.",
+      });
     }
-  }
-
-  async function getQuestionAuthorMatchByUsername() {
-    // Fallback: compare current user's username to question author's username
-    if (!currentUser || !qAuthorUsername) return false;
-    const snap = await getDocs(query(collection(db, "users"), where("uid", "==", currentUser.uid)));
-    const data = snap.docs[0]?.data() as any;
-    return data?.username && data.username === qAuthorUsername;
   }
 
   async function upvoteAnswer(answerId: string) {
+    if (!currentUser) {
+      toast({
+        title: "Sign in required",
+        description: "You need to be signed in to upvote answers.",
+      });
+      return;
+    }
+
     try {
       const answerRef = doc(db, "questions", questionId, "answers", answerId);
-      await updateDoc(answerRef, {
-        upvotes: increment(1),
-      });
+      const voteRef = doc(answerRef, "votes", currentUser.uid);
 
-      setAnswers((prev) =>
-        prev.map((ans) =>
-          ans.id === answerId
-            ? { ...ans, upvotes: (ans.upvotes || 0) + 1 }
-            : ans
-        )
-      );
+      const voteSnap = await getDoc(voteRef);
+      const isUpvoted = voteSnap.exists();
+
+      if (isUpvoted) {
+        await deleteDoc(voteRef);
+        await updateDoc(answerRef, { upvotes: increment(-1) });
+        
+        setAnswers((prev) =>
+          prev.map((ans) =>
+            ans.id === answerId
+              ? { 
+                  ...ans, 
+                  upvotes: (ans.upvotes || 0) - 1,
+                  hasUpvoted: false
+                }
+              : ans
+          )
+        );
+      } else {
+        await setDoc(voteRef, { uid: currentUser.uid });
+        await updateDoc(answerRef, { upvotes: increment(1) });
+        
+        setAnswers((prev) =>
+          prev.map((ans) =>
+            ans.id === answerId
+              ? { 
+                  ...ans, 
+                  upvotes: (ans.upvotes || 0) + 1,
+                  hasUpvoted: true
+                }
+              : ans
+          )
+        );
+      }
     } catch (err) {
       console.error("Failed to upvote:", err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to register your vote. Please try again.",
+      });
     }
   }
 
-  if (loading)
-    return <p className="text-muted-foreground">Loading answers...</p>;
+  // Safe date formatter to avoid 'Invalid Date'
+  const formatDate = (iso?: string | null) => {
+    if (!iso) return 'Unknown date';
+    try {
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? 'Unknown date' : d.toLocaleDateString();
+    } catch {
+      return 'Unknown date';
+    }
+  };
+
+  if (loading) return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Answers</h2>
+        <div className="h-8 w-12 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+      </div>
+      
+      {[1, 2].map(i => (
+        <div key={i} className="p-6 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 animate-pulse">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+            <div className="space-y-2">
+              <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/6"></div>
+          </div>
+          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+            <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded ml-auto"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold">Answers</h2>
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Answers</h2>
+        <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-sm font-medium px-3 py-1 rounded-full">
+          {answers.length}
+        </span>
+      </div>
 
       {answers.length > 0 ? (
-        <ul className="space-y-4">
+        <div className="space-y-6">
           {answers.map((ans) => (
-            <li
-              key={ans.id}
-              className="p-4 border rounded bg-muted/30 shadow-md"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={ans.author.avatarUrl} />
-                  <AvatarFallback>
+            <div key={ans.id} className={`p-6 rounded-xl shadow-sm border bg-white dark:bg-gray-900 dark:border-gray-700 ${ans.accepted ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-900/20' : 'border-gray-200'}`}>
+              <div className="flex items-start gap-4 mb-4">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={ans.author.avatarUrl} alt={ans.author.username} />
+                  <AvatarFallback className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                     {ans.author.username?.charAt(0).toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
-                <Link href={`/user/${ans.author.username}`} className="font-medium hover:underline flex items-center gap-1">
-                  {ans.author.username}
-                  {/** Verified tick if author is verified */}
-                  {(ans as any).author?.verified && <VerifiedTick size={14} />}
-                </Link>
-                {ans.accepted && (
-                  <span className="ml-2 inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full text-xs">
-                    ✓ Accepted
-                  </span>
-                )}
-                {/* Accept button for question owner */}
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href={`/user/${ans.author.username}`} className="font-medium hover:underline inline-flex items-center gap-1 text-gray-900 dark:text-white">
+                      {ans.author.username}
+                      {ans.author?.verified && <VerifiedTick size={14} />}
+                    </Link>
+                    
+                    {ans.accepted && (
+                      <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 rounded-full text-xs font-medium">
+                        <CheckBadgeIcon className="h-3.5 w-3.5" /> Accepted
+                      </span>
+                    )}
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {ans.createdAt ? formatDate(ans.createdAt.toDate ? ans.createdAt.toDate().toISOString() : ans.createdAt) : 'Unknown date'}
+                  </p>
+                </div>
+                
                 {currentUser && qAuthorUid === currentUser.uid && (
-                  <Button size="sm" variant={ans.accepted ? "secondary" : "outline"} className="ml-auto" onClick={() => toggleAccept(ans.id)}>
-                    {ans.accepted ? "Unaccept" : "Accept"}
+                  <Button 
+                    size="sm" 
+                    variant={ans.accepted ? "secondary" : "outline"} 
+                    className="ml-auto"
+                    onClick={() => toggleAccept(ans.id)}
+                  >
+                    {ans.accepted ? "Unaccept" : "Accept Answer"}
                   </Button>
                 )}
               </div>
-
-              <p className="mb-3 text-gray-900"><MentionText text={ans.text} /></p>
-
-              {/* ✅ Upvote Debug Button */}
-              <div className="flex items-center gap-2 text-sm bg-yellow-100 border border-yellow-400 p-2 rounded">
-                <span className="text-xs text-gray-600">⬆️ Upvote button:</span>
+              
+              <div className="prose prose-gray dark:prose-invert max-w-none mb-4">
+                {(() => {
+                  const raw = ans.text || "";
+                  // Heuristic: if the stored answer contains HTML tags, treat as rich text; otherwise use MentionText for plaintext mentions
+                  const looksLikeHtml = /<[^>]+>/.test(raw);
+                  if (!looksLikeHtml) {
+                    return <MentionText text={raw} />;
+                  }
+                  // Sanitize the HTML to prevent XSS. DOMPurify is run client-side since this is a client component.
+                  let clean = "";
+                  try {
+                    clean = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
+                  } catch (e) {
+                    // Fallback to escaped text if sanitization fails
+                    return <MentionText text={raw} />;
+                  }
+                  // Optional lightweight mention linkifying inside sanitized HTML (avoid touching existing anchors)
+                  const linkified = clean.replace(/(^|[\s>])@([a-zA-Z0-9_]{3,30})\b/g, (m, pre, user) => {
+                    // Skip if already part of an anchor tag (simple containment check)
+                    if (/<a [^>]*?>[^<]*?$/.test(pre)) return m;
+                    return `${pre}<a href="/user/${user}" class="text-blue-600 dark:text-blue-400 hover:underline">@${user}</a>`;
+                  });
+                  return <div dangerouslySetInnerHTML={{ __html: linkified }} />;
+                })()}
+              </div>
+              
+              <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
                 <button
                   onClick={() => upvoteAnswer(ans.id)}
-                  className="text-sm font-semibold text-blue-600 hover:underline"
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+                    ans.hasUpvoted 
+                      ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30" 
+                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  } transition-colors`}
                 >
-                  ⬆️ {ans.upvotes ?? 0}
+                  <ArrowUpIcon className="h-5 w-5" />
+                  <span className="font-medium">{ans.upvotes || 0}</span>
+                  <span className="sr-only">Upvotes</span>
                 </button>
+                
+                {ans.accepted && (
+                  <div className="text-emerald-600 dark:text-emerald-400 text-sm font-medium flex items-center gap-1">
+                    <CheckBadgeIcon className="h-4 w-4" /> This answer solved the problem
+                  </div>
+                )}
               </div>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       ) : (
-        <p className="text-muted-foreground">
-          No answers yet. Be the first to reply!
-        </p>
+        <div className="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
+          <div className="text-gray-400 dark:text-gray-500 mb-2">
+            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No answers yet</h3>
+          <p className="text-muted-foreground max-w-md mx-auto">Be the first to share your knowledge and help solve this problem!</p>
+        </div>
       )}
 
-      {currentUser ? (
-        <div className="border-t pt-6">
-          <h3 className="text-lg font-semibold mb-2">Your Answer</h3>
-          <Textarea
-            value={reply}
-            onChange={(e) => setReply(e.target.value)}
-            placeholder="Write your answer..."
-          />
-          <Button onClick={submitAnswer} className="mt-2">
-            Submit Answer
-          </Button>
-        </div>
-      ) : (
-        <div className="border-t pt-6">
-          <p className="text-sm text-muted-foreground">Please sign in to post an answer.</p>
-          <Link className="inline-block mt-2" href="/auth/sign-in"><Button>Sign in</Button></Link>
-        </div>
-      )}
+      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Your Answer</h3>
+        
+        {currentUser ? (
+          <div className="space-y-4">
+            <div className="border rounded-lg overflow-hidden shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 dark:border-gray-700">
+              <RichTextEditor
+                value={replyHtml}
+                onChange={setReplyHtml}
+                placeholder="Write your answer here... Use the formatting tools to make it clear and helpful."
+                className="min-h-[200px]"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Make sure your answer is clear, detailed, and helpful to others.
+              </p>
+              
+              <Button 
+                onClick={submitAnswer} 
+                disabled={!replyHtml.trim() || isSubmitting}
+                className="min-w-[120px]"
+              >
+                {isSubmitting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Posting...
+                  </>
+                ) : "Post Answer"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground mb-4">Sign in to answer this question.</p>
+            <Button asChild>
+              <Link href="/login">Sign In</Link>
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

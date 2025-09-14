@@ -1,15 +1,61 @@
-# Firebase Studio
+# Manthan
 
-This is a NextJS starter in Firebase Studio.
+Manthan is a collaborative learning hub where students explore ideas, ask questions, publish blogs, share real-time "moments", take quizzes, and build community.
 
-To get started, take a look at src/app/page.tsx.
+## Tech Stack
+- Next.js (App Router, TypeScript)
+- Firebase (Auth, Firestore)
+- ImageKit (media uploads)
+- Tailwind CSS + Radix UI
 
-## Environment variables
+## Key Features
+- Moments feed with image uploads, likes, favorites, and comments with @mentions
+- Blogging & questions with tagging
+- User profiles with favorite moments
+- Real-time notifications (mentions)
+- PWA manifest + mobile-safe viewport adjustments
 
-This app uses Firebase and ImageKit. To enable Cloudinary attachments for chat, add the following to `.env.local`:
+## Getting Started
+1. Install dependencies: `npm install`
+2. Copy `.env.example` to `.env.local` (if present) or create `.env.local` and add required keys (Firebase, ImageKit, optional Cloudinary if still used elsewhere).
+3. Run the dev server: `npm run dev`
+4. Open http://localhost:3000
 
-- CLOUDINARY_CLOUD_NAME=your_cloud_name
-- CLOUDINARY_API_KEY=your_api_key
-- CLOUDINARY_API_SECRET=your_api_secret
+## Environment Variables
+Place in `.env.local`:
 
-After setting envs, restart the dev server.
+Firebase (example):
+```
+NEXT_PUBLIC_FIREBASE_API_KEY=...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+NEXT_PUBLIC_FIREBASE_APP_ID=...
+```
+
+ImageKit:
+```
+IMAGEKIT_PRIVATE_KEY=...
+IMAGEKIT_PUBLIC_KEY=...
+IMAGEKIT_URL_ENDPOINT=...
+```
+
+Optional (legacy Cloudinary for certain uploads if still enabled):
+```
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+```
+
+## Scripts
+- `npm run dev` – start local development
+- `npm run build` – production build
+- `npm run start` – start production server
+- `npm run typecheck` – run TypeScript
+
+## Branding
+All prior references to "CollabCampus" have been renamed to "Manthan".
+
+## License
+Private / Internal (add a license if you intend to distribute).

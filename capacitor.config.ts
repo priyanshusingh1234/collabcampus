@@ -5,8 +5,8 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const serverUrl = process.env.CAP_SERVER_URL || undefined;
 
 const config: CapacitorConfig = {
-  appId: 'com.collabcampus.app',
-  appName: 'CollabCampus',
+  appId: 'com.manthan.app',
+  appName: 'Manthan',
   bundledWebRuntime: false,
   webDir: '.next', // not used when server.url is set
   server: serverUrl

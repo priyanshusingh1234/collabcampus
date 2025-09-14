@@ -14,6 +14,7 @@ import Link from "next/link";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { isPremium } from '@/lib/premium';
 
 interface BlogPost {
   id: string;
@@ -108,12 +109,11 @@ export default function BlogsPage() {
         userSnapshots.forEach((doc) => {
           const data = doc.data() as any;
           if (data?.username) {
+            const prem = isPremium(data); // will be false if fields absent
             userMap[data.username] = {
-              avatarUrl:
-                data.avatarUrl ||
-                `https://api.dicebear.com/8.x/initials/svg?seed=${data.username}`,
+              avatarUrl: data.avatarUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${data.username}`,
               verified: !!data.verified,
-              isPremium: Boolean(data.isPremium || data.plan === 'pro' || data.subscription?.status === 'active' || data.role === 'premium'),
+              isPremium: prem,
               plan: data.plan ?? null,
               subscription: data.subscription ?? null,
               role: data.role ?? undefined,
@@ -130,7 +130,7 @@ export default function BlogsPage() {
         username: post.username,
         avatarUrl: user?.avatarUrl || post.author?.avatarUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${post.username}`,
         verified: user?.verified ?? post.author?.verified,
-              isPremium: user?.isPremium,
+              isPremium: user?.isPremium === true,
             },
       image: (post as any).image || (post as any).imageUrl || "",
           };

@@ -21,9 +21,10 @@ export function Header() {
   const pathname = usePathname();
 
   const navLinks = [
+    { href: "/moments", label: "Moments" },
     { href: "/blogs", label: "Blogs" },
     { href: "/questions", label: "Questions" },
-  { href: "/quiz", label: "Quizzes" },
+    { href: "/quiz", label: "Quizzes" },
     { href: "/users", label: "Users" },
     { href: "/leaderboard", label: "Leaderboard" },
     { href: "/new-post", label: "New Post" },
@@ -45,8 +46,8 @@ export function Header() {
               <SheetTitle className="sr-only">Main menu</SheetTitle>
               <div className="mt-2">
                 <Link href="/" className="flex items-center gap-2 px-2 py-1">
-                  <Logo className="h-6 w-6" />
-                  <span className="font-bold font-headline">CollabCampus</span>
+                  <Logo className="h-6 w-6" variant="black" />
+                  <span className="font-bold font-headline">Manthan</span>
                 </Link>
                 <nav className="mt-4 grid">
                   {navLinks.map(({ href, label }) => (
@@ -74,16 +75,16 @@ export function Header() {
             </SheetContent>
           </Sheet>
           <Link href="/" className="flex items-center gap-1">
-            <Logo className="h-6 w-6" />
-            <span className="sr-only">CollabCampus</span>
+            <Logo className="h-6 w-6" variant="black" />
+            <span className="sr-only">Manthan</span>
           </Link>
         </div>
 
         {/* Desktop: brand + main nav */}
         <div className="mr-4 hidden md:flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <Logo className="h-6 w-6" />
-            <span className="hidden font-bold sm:inline-block font-headline">CollabCampus</span>
+            <Logo className="h-6 w-6" variant="black" />
+            <span className="hidden font-bold sm:inline-block font-headline">Manthan</span>
           </Link>
           <nav className="flex items-center gap-6 text-sm">
             {navLinks.map(({ href, label }) => (

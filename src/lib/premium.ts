@@ -7,16 +7,19 @@ export const PREMIUM_PRICE = {
 // No payments here—this simply trusts flags on the user document.
 export function isPremium(user: any): boolean {
   if (!user) return false;
-  const role = (user.role || "").toString().toLowerCase();
-  const plan = (user.plan || "").toString().toLowerCase();
-  const subActive = Boolean(user.subscription?.status === "active");
-  return Boolean(
-    user.isPremium === true ||
-    role === "premium" ||
-    role === "pro" ||
-    plan === "pro" ||
-    subActive
-  );
+  // Legacy-compatible but stricter: only explicit flag or active subscription.
+  // (Removed role/plan heuristics that caused unintended premium exposure.)
+  const subActive = user?.subscription?.status === 'active';
+  return user.isPremium === true || subActive === true;
+}
+
+// Ensure a user object has explicit premium defaults (non-destructive)
+export function ensurePremiumDefaults<T extends Record<string, any>>(user: T | null | undefined): T | null | undefined {
+  if (!user) return user;
+  if (typeof user.isPremium === 'undefined') {
+    (user as any).isPremium = false;
+  }
+  return user;
 }
 
 // Not used anymore; kept for API compatibility. Returns false by default.

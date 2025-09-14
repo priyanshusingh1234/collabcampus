@@ -41,6 +41,7 @@ import { toast } from "sonner";
 import { getConversationId } from "@/lib/chat";
 import { subscribePresence, type PresenceDoc } from "@/lib/presence";
 import { isPremium } from "@/lib/premium";
+import { MomentCard, type MomentDoc } from '@/components/moments/MomentCard';
 
 export default function PublicUserProfile() {
   const { username } = useParams();
@@ -70,6 +71,7 @@ export default function PublicUserProfile() {
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followingOpen, setFollowingOpen] = useState(false);
   const [rank, setRank] = useState<number | null>(null);
+  const [favoriteMoments, setFavoriteMoments] = useState<MomentDoc[]>([]);
 
   const db = getFirestore(auth.app);
 
@@ -127,6 +129,24 @@ export default function PublicUserProfile() {
         const postsSnap = await getDocs(postsQuery);
         const postsList = postsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setPosts(postsList);
+
+        // Load favorite moments (public)
+        try {
+          if (Array.isArray((profile as any).favoriteMoments) && (profile as any).favoriteMoments.length > 0) {
+            const favIds: string[] = (profile as any).favoriteMoments.slice(0, 18);
+            const fav: MomentDoc[] = [];
+            for (const id of favIds) {
+              try {
+                const ref = doc(db, 'moments', id);
+                const snapFav = await getDoc(ref);
+                if (snapFav.exists()) fav.push({ id: snapFav.id, ...(snapFav.data() as any) });
+              } catch {}
+            }
+            setFavoriteMoments(fav);
+          } else {
+            setFavoriteMoments([]);
+          }
+        } catch {}
 
         // Check if current user follows profile user
         if (currentUser) {
@@ -495,6 +515,45 @@ export default function PublicUserProfile() {
           open={chatOpen}
           onOpenChange={setChatOpen}
         />
+      )}
+
+      {/* Favorite Moments (circular thumbnails) */}
+      {favoriteMoments.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-xl font-semibold mb-4">Favorite Moments</h2>
+          <div className="flex flex-wrap gap-4">
+            {favoriteMoments.map(f => {
+              const first = f.media?.[0];
+              return (
+                <Link
+                  key={f.id}
+                  href={`/moments/${f.id}`}
+                  className="group relative h-24 w-24 rounded-full overflow-hidden ring-2 ring-transparent hover:ring-indigo-400 transition focus:outline-none focus:ring-indigo-500"
+                  title={f.caption || 'Moment'}
+                >
+                  {first ? (
+                    <img
+                      src={first.url}
+                      alt={f.caption || 'Moment'}
+                      className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 text-gray-500 text-xs text-center p-2">
+                      No Media
+                    </div>
+                  )}
+                  {/* Overlay on hover */}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span className="text-white text-xs font-medium line-clamp-2 px-2 text-center leading-tight">
+                      {f.caption || 'View'}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {/* Posts grid */}

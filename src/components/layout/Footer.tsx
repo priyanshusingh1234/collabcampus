@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { FaGithub, FaTwitter, FaLinkedin } from 'react-icons/fa';
+import { Logo } from '@/components/branding/Logo';
 
 
 export default function Footer() {
@@ -7,8 +8,8 @@ export default function Footer() {
     <footer className="w-full border-t border-gray-800 bg-[#161b22] text-gray-400 py-8 mt-12">
       <div className="max-w-3xl mx-auto flex flex-col items-center justify-center gap-4 px-4">
         <div className="flex items-center gap-2 mb-2">
-          <img src="/favicon.ico" alt="CollabCampus Logo" className="w-6 h-6" />
-          <span className="font-semibold text-base text-gray-200">CollabCampus</span>
+          <Logo className="w-6 h-6" variant="outline" />
+          <span className="font-semibold text-base text-gray-200">Manthan</span>
         </div>
   <nav className="flex flex-col items-center gap-2 text-sm justify-center mb-2">
           <Link href="/" className="hover:text-white transition-colors">Home</Link>
@@ -32,7 +33,7 @@ export default function Footer() {
         </div>
         <div className="w-full border-t border-gray-700 mt-6"></div>
         <div className="text-xs text-center w-full pt-4 text-gray-500">
-          &copy; {new Date().getFullYear()} CollabCampus. Built by students, for students.
+          &copy; {new Date().getFullYear()} Manthan. Built by students, for students.
         </div>
       </div>
     </footer>

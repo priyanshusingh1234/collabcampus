@@ -8,8 +8,8 @@ import Footer from '@/components/layout/Footer';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'CollabCampus - The Ultimate Student Platform',
-  description: 'A full-stack student platform for collaboration, learning, and growth.',
+  title: 'Manthan – Ignite Curiosity, Build Together',
+  description: 'Manthan is a collaborative learning hub where students explore ideas, ask questions, share knowledge, and grow together.',
 };
 
 export default function RootLayout({
@@ -20,9 +20,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111827" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="alternate" type="application/rss+xml" title="CollabCampus RSS" href="/rss.xml" />
-  <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+  <link rel="alternate" type="application/rss+xml" title="Manthan RSS" href="/rss.xml" />
+  <link rel="icon" href="/logo.svg?v=2" type="image/svg+xml" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
