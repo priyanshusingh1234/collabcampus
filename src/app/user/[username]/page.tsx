@@ -42,6 +42,7 @@ import { getConversationId } from "@/lib/chat";
 import { subscribePresence, type PresenceDoc } from "@/lib/presence";
 import { isPremium } from "@/lib/premium";
 import { MomentCard, type MomentDoc } from '@/components/moments/MomentCard';
+import SeoClient from '@/components/SeoClient';
 
 export default function PublicUserProfile() {
   const { username } = useParams();
@@ -335,6 +336,17 @@ export default function PublicUserProfile() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
+      {userData && (
+        <SeoClient
+          title={`${userData.displayName || userData.username}`}
+          description={userData.bio || `View @${userData.username}'s profile on Manthan`}
+          url={`/user/${userData.username}`}
+          image={userData.avatarUrl || null}
+          type="profile"
+          jsonLd="profile"
+          authorName={userData.displayName || userData.username}
+        />
+      )}
       {loading ? (
         <div className="p-10 text-center text-lg">Loading...</div>
       ) : !userData ? (

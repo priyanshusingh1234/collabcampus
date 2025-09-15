@@ -23,6 +23,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
 import { Button } from '@/components/ui/button';
+import SeoClient from '@/components/SeoClient';
 import Head from 'next/head';
 import { Heart, Eye, Share2, Link as LinkIcon, Clock, Bookmark } from 'lucide-react';
 import CommentSection from '@/components/comments/CommentSection';
@@ -363,6 +364,18 @@ export default function BlogPage({ params }: { params: { slug: string } }) {
 
   return (
     <>
+      {/* SEO for blog article */}
+      {blog && (
+        <SeoClient
+          title={blog.title}
+          description={(blog.content || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)}
+          url={typeof window !== 'undefined' ? window.location.href : `/blog/${slug}`}
+          image={blog.image || blog.imageUrl || null}
+          type="article"
+          publishedTime={blog.createdAt?.toDate?.()?.toISOString?.() || undefined}
+          authorName={author?.username || blog.username}
+        />
+      )}
       {/* Reading progress bar */}
       <div className="fixed top-0 left-0 right-0 h-1 z-40 bg-transparent">
         <div

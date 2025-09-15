@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { MomentCard, MomentDoc } from './MomentCard';
 import { MomentComments } from './MomentComments';
+import SeoClient from '@/components/SeoClient';
 
 export function MomentClient({ id }: { id: string }) {
   const [moment, setMoment] = useState<MomentDoc | null>(null);
@@ -27,6 +28,16 @@ export function MomentClient({ id }: { id: string }) {
   if (!moment) return <div className='px-4 py-8 text-sm text-muted-foreground'>Moment not found.</div>;
   return (
     <div className='max-w-xl mx-auto px-3 sm:px-4 md:px-6 py-6'>
+      <SeoClient
+        title={(moment.caption ? moment.caption.slice(0, 70) : `Moment by @${moment.username}`)}
+        description={(moment.caption || '').slice(0, 160)}
+        url={`/moments/${moment.id}`}
+        image={(moment.media && moment.media[0]?.url) ? moment.media[0].url : null}
+        type="article"
+        jsonLd="article"
+        authorName={moment.username}
+        publishedTime={(moment.createdAt?.toDate ? moment.createdAt.toDate() : (moment.createdAt ? new Date(moment.createdAt) : undefined))?.toISOString()}
+      />
       <MomentCard m={moment} />
       <MomentComments momentId={moment.id} author={{ uid: moment.authorId, username: moment.username }} />
     </div>
