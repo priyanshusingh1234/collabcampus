@@ -42,9 +42,13 @@ export async function maybeUpdateVerificationByUid(uid: string) {
 }
 
 export function determineVerified(user: any): boolean {
-  // Only admin-approved users are verified
+  // Sticky verification logic:
+  // - Admin override always verifies the user
+  // - If user.verified is already true, keep it true (do not downgrade on incidental recomputes)
+  //   Admin tools explicitly toggle verified to false when needed.
   const adminOverride = !!user?.verifiedByAdmin;
-  return adminOverride;
+  const current = !!user?.verified;
+  return adminOverride || current;
 }
 
 export async function recomputeVerificationFromSnapshot(userRef: any) {
