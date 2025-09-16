@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import * as Icons from "lucide-react";
 import { toast } from "sonner";
+import { getIceServers } from "@/lib/webrtc";
 
 type BasicUser = {
   uid: string;
@@ -86,11 +87,7 @@ export function VoiceCall({
 
   const getPc = useCallback(() => {
     if (pcRef.current) return pcRef.current;
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: ["stun:stun.l.google.com:19302", "stun:global.stun.twilio.com:3478"] },
-      ],
-    });
+    const pc = new RTCPeerConnection({ iceServers: getIceServers() });
     pc.onicecandidate = async (event) => {
       if (!event.candidate) return;
       const role = myRoleRef.current;
