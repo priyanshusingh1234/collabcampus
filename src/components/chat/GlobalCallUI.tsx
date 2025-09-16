@@ -1,0 +1,156 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { collectionGroup, doc, onSnapshot, query, updateDoc, where, getDocs, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { getConversationId, type BasicUser } from "@/lib/chat";
+import VoiceCall from "@/components/chat/VoiceCall";
+import { Button } from "@/components/ui/button";
+import * as Icons from "lucide-react";
+
+type CallDoc = {
+  status: "ringing" | "accepted" | "connected" | "ended";
+  fromUid: string;
+  toUid: string;
+  createdAt?: any;
+  updatedAt?: any;
+};
+
+export default function GlobalCallUI() {
+  const { user } = useAuth();
+  const [incoming, setIncoming] = useState<{
+    conversationId: string;
+    callPath: string; // full path to calls/current
+    data: CallDoc;
+    caller?: BasicUser;
+  } | null>(null);
+  const [autoAccept, setAutoAccept] = useState(false);
+  const unsubRef = useRef<null | (() => void)>(null);
+
+  // Subscribe to any ringing calls targeting this user
+  useEffect(() => {
+    if (!user?.uid) return;
+    // Clean any prior sub
+    if (unsubRef.current) {
+      unsubRef.current();
+      unsubRef.current = null;
+    }
+    const cg = collectionGroup(db, "calls");
+    const q = query(cg, where("toUid", "==", user.uid));
+    const unsub = onSnapshot(q, async (snap) => {
+      // Find a ringing call addressed to me
+      const first = snap.docs
+        .map((d) => ({ path: d.ref.path, data: d.data() as CallDoc }))
+        .find((d) => d.data.status === "ringing");
+      if (!first) {
+        setIncoming(null);
+        setAutoAccept(false);
+        return;
+      }
+      // conversationId is parent of 'calls/current': conversations/{id}/calls/current
+      const parts = first.path.split("/");
+      const convId = parts.length >= 3 ? parts[1] : getConversationId(user.uid, (first.data.fromUid || ""));
+      // fetch caller basic profile
+      let caller: BasicUser | undefined = undefined;
+      try {
+        const qs = await getDocs(query(collection(db, "users"), where("uid", "==", first.data.fromUid)));
+        const doc0 = qs.docs[0];
+        if (doc0) {
+          const d = doc0.data() as any;
+          caller = { uid: d.uid, username: d.username, displayName: d.displayName, avatarUrl: d.avatarUrl };
+        }
+      } catch {}
+      setIncoming({ conversationId: convId, callPath: first.path, data: first.data, caller });
+    });
+    unsubRef.current = unsub;
+    return () => {
+      unsub();
+      unsubRef.current = null;
+    };
+  }, [user?.uid]);
+
+  async function decline() {
+    if (!incoming) return;
+    try {
+      await updateDoc(doc(db, incoming.callPath), { status: "ended", endReason: "declined" });
+    } catch {}
+    setIncoming(null);
+    setAutoAccept(false);
+  }
+
+  async function hangup() {
+    if (!incoming) return;
+    try {
+      await updateDoc(doc(db, incoming.callPath), { status: "ended", endReason: "hangup" });
+    } catch {}
+    setIncoming(null);
+    setAutoAccept(false);
+  }
+
+  if (!incoming || !user) return null;
+
+  const me: BasicUser & { uid: string } = {
+    uid: user.uid,
+    username: (user as any).username,
+    displayName: user.displayName || (user as any).username,
+    avatarUrl: (user as any).photoURL,
+  };
+  const other: BasicUser & { uid: string } = incoming.caller || { uid: incoming.data.fromUid } as any;
+
+  const isRinging = incoming.data.status === "ringing";
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80">
+      {/* Hidden VoiceCall host to manage WebRTC once accepted */}
+      <div className="absolute top-0 left-0 opacity-0 pointer-events-none">
+        <VoiceCall
+          conversationId={incoming.conversationId}
+          me={me}
+          other={other}
+          compact
+          autoAccept={autoAccept}
+          hideInlineControls
+        />
+      </div>
+
+      <div className="w-full max-w-sm mx-auto px-6">
+        <div className="flex flex-col items-center gap-6 text-white">
+          <div className="mt-6 text-sm uppercase tracking-wide opacity-80">Incoming call</div>
+          <div className="h-24 w-24 rounded-full overflow-hidden ring-4 ring-white/20 shadow-lg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={other.avatarUrl || "/favicon.ico"} alt="avatar" className="h-full w-full object-cover" />
+          </div>
+          <div className="text-2xl font-semibold text-center">
+            {other.displayName || other.username || "Unknown"}
+          </div>
+          <div className="mt-8 flex items-center justify-between w-full">
+            <div className="flex flex-col items-center gap-3">
+              <Button size="icon" className="h-16 w-16 rounded-full bg-red-600 hover:bg-red-700" onClick={decline}>
+                <Icons.PhoneOff className="h-7 w-7" />
+              </Button>
+              <div className="text-xs opacity-80">Decline</div>
+            </div>
+            <div className="flex flex-col items-center gap-3">
+              <Button
+                size="icon"
+                className="h-16 w-16 rounded-full bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => setAutoAccept(true)}
+              >
+                <Icons.Phone className="h-7 w-7 rotate-90" />
+              </Button>
+              <div className="text-xs opacity-80">Accept</div>
+            </div>
+          </div>
+          {!isRinging && (
+            <div className="mt-6 flex items-center gap-4">
+              <Button variant="secondary" onClick={hangup}>
+                <Icons.PhoneOff className="h-4 w-4 mr-2" /> Hang up
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

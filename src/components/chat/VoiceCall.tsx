@@ -43,12 +43,16 @@ export function VoiceCall({
   other,
   blocked,
   compact = false,
+  autoAccept = false,
+  hideInlineControls = false,
 }: {
   conversationId: string;
   me: BasicUser & { uid: string };
   other: BasicUser & { uid: string };
   blocked?: { byMe: boolean; byOther: boolean };
   compact?: boolean; // when true, render only the icon button; banners render inline when active
+  autoAccept?: boolean; // when true and an inbound ringing call exists, auto-accept
+  hideInlineControls?: boolean; // suppress inline banners/controls (used by GlobalCallUI host)
 }) {
   const callRef = useMemo(() => doc(db, "conversations", conversationId, "calls", "current"), [conversationId]);
   const callerCandidatesRef = useMemo(() => collection(db, "conversations", conversationId, "calls", "current", "callerCandidates"), [conversationId]);
@@ -65,6 +69,7 @@ export function VoiceCall({
   const startedRef = useRef(false);
   const myRoleRef = useRef<"caller" | "callee" | null>(null);
   const iceUnsubsRef = useRef<Array<() => void>>([]);
+  const acceptedOnceRef = useRef(false);
 
   useEffect(() => {
     const unsub = onSnapshot(callRef, (snap) => {
@@ -84,6 +89,19 @@ export function VoiceCall({
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
+
+  // Auto-accept when requested by parent (e.g., GlobalCallUI)
+  useEffect(() => {
+    if (!autoAccept) return;
+    if (!inbound) return;
+    if (acceptedOnceRef.current) return;
+    if (call?.status === "ringing" && call.toUid === me.uid) {
+      acceptedOnceRef.current = true;
+      acceptCall().catch(() => {
+        acceptedOnceRef.current = false;
+      });
+    }
+  }, [autoAccept, inbound, call?.status, call?.toUid, me.uid]);
 
   const getPc = useCallback(() => {
     if (pcRef.current) return pcRef.current;
@@ -299,38 +317,42 @@ export function VoiceCall({
     <div className="flex items-center gap-2">
       <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
       {/* Start/Active buttons */}
-      <Button
-        variant="ghost"
-        size={compact ? "icon" : "sm"}
-        onClick={startCall}
-        disabled={!canStart || loading}
-        title={blocked?.byMe ? "You've blocked this user" : blocked?.byOther ? "You can't call this user" : "Start voice call"}
-      >
-        <Icons.Phone className="h-5 w-5" />{!compact && <span className="ml-2 hidden sm:inline">Call</span>}
-      </Button>
-
-      {/* Incoming banner */}
-      {inbound && call?.status === "ringing" && (
-        <div className="flex items-center gap-2 bg-amber-100 text-amber-900 px-2 py-1 rounded-md">
-          <Icons.PhoneIncoming className="h-4 w-4" />
-          <span className="text-xs">Incoming call</span>
-          <Button size="sm" variant="default" onClick={acceptCall} disabled={loading}>Accept</Button>
-          <Button size="sm" variant="secondary" onClick={declineCall} disabled={loading}>Decline</Button>
-        </div>
-      )}
-
-      {/* Ongoing call controls */}
-      {call && call.status !== "ended" && (
-        <div className="flex items-center gap-2 bg-emerald-600 text-white px-2 py-1 rounded-md">
-          <Icons.PhoneCall className="h-4 w-4" />
-          <span className="text-xs">{connected ? "Connected" : call.status === "ringing" ? "Ringing…" : call.status}</span>
-          <Button size="icon" variant="secondary" onClick={toggleMute} title={micMuted ? "Unmute" : "Mute"}>
-            {micMuted ? <Icons.MicOff className="h-4 w-4" /> : <Icons.Mic className="h-4 w-4" />}
+      {!hideInlineControls && (
+        <>
+          <Button
+            variant="ghost"
+            size={compact ? "icon" : "sm"}
+            onClick={startCall}
+            disabled={!canStart || loading}
+            title={blocked?.byMe ? "You've blocked this user" : blocked?.byOther ? "You can't call this user" : "Start voice call"}
+          >
+            <Icons.Phone className="h-5 w-5" />{!compact && <span className="ml-2 hidden sm:inline">Call</span>}
           </Button>
-          <Button size="icon" variant="destructive" onClick={endCall} title="Hang up">
-            <Icons.PhoneOff className="h-4 w-4" />
-          </Button>
-        </div>
+
+          {/* Incoming banner */}
+          {inbound && call?.status === "ringing" && (
+            <div className="flex items-center gap-2 bg-amber-100 text-amber-900 px-2 py-1 rounded-md">
+              <Icons.PhoneIncoming className="h-4 w-4" />
+              <span className="text-xs">Incoming call</span>
+              <Button size="sm" variant="default" onClick={acceptCall} disabled={loading}>Accept</Button>
+              <Button size="sm" variant="secondary" onClick={declineCall} disabled={loading}>Decline</Button>
+            </div>
+          )}
+
+          {/* Ongoing call controls */}
+          {call && call.status !== "ended" && (
+            <div className="flex items-center gap-2 bg-emerald-600 text-white px-2 py-1 rounded-md">
+              <Icons.PhoneCall className="h-4 w-4" />
+              <span className="text-xs">{connected ? "Connected" : call.status === "ringing" ? "Ringing…" : call.status}</span>
+              <Button size="icon" variant="secondary" onClick={toggleMute} title={micMuted ? "Unmute" : "Mute"}>
+                {micMuted ? <Icons.MicOff className="h-4 w-4" /> : <Icons.Mic className="h-4 w-4" />}
+              </Button>
+              <Button size="icon" variant="destructive" onClick={endCall} title="Hang up">
+                <Icons.PhoneOff className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

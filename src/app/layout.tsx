@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import Footer from '@/components/layout/Footer';
 import './globals.css';
+import GlobalCallUI from '@/components/chat/GlobalCallUI';
 
 export const metadata: Metadata = {
   title: 'Manthan – Ignite Curiosity, Build Together',
@@ -42,6 +43,8 @@ export default function RootLayout({
             {/* Bottom mobile nav removed in favor of compact header with hamburger menu */}
             <main id="main" className="flex-1">{children}</main>
             <Footer />
+            {/* Global full-screen incoming call UI */}
+            <GlobalCallUI />
           </div>
           <Toaster />
         </AuthProvider>
