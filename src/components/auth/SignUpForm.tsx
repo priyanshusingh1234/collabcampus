@@ -37,9 +37,11 @@ import {
 import { SocialSignInButtons } from "./SocialSignInButtons";
 
 const formSchema = z.object({
-  username: z.string().min(3, {
-    message: "Username must be at least 3 characters.",
-  }),
+  username: z
+    .string()
+    .min(3, { message: "Username must be at least 3 characters." })
+    .transform((v) => v.trim().toLowerCase())
+    .refine((v) => !/\s/.test(v), { message: "Username cannot contain spaces." }),
   email: z.string().email({ message: "Please enter a valid email." }),
   password: z.string().min(8, {
     message: "Password must be at least 8 characters.",
@@ -60,23 +62,23 @@ export function SignUpForm() {
     },
   });
 
-  useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.push("/");
-      }
-    });
-    return () => unsubscribe();
-  }, [router]);
+  // Removed global auth redirect here to allow explicit routing after signup
 
-  async function storeUserInFirestore(user: any, username?: string) {
+  function sanitizeUsername(input?: string | null, fallback?: string): string {
+    const base = (input || "").trim().toLowerCase();
+    if (base && !/\s/.test(base)) return base;
+    const fb = (fallback || "").trim().toLowerCase().replace(/\s+/g, "");
+    return fb || "user";
+  }
+
+  async function storeUserInFirestore(user: any, username?: string): Promise<string> {
     const db = getFirestore();
     const userRef = doc(db, "users", user.uid);
     const existing = await getDoc(userRef);
 
     if (!existing.exists()) {
-      const uname = (username ?? user.displayName) || "";
+      // enforce lowercase, no spaces; fallback to email local-part
+      const uname = sanitizeUsername(username ?? user.displayName, user.email?.split("@")[0]);
       await setDoc(userRef, {
         uid: user.uid,
         email: user.email,
@@ -90,7 +92,11 @@ export function SignUpForm() {
         followers: [],
         following: [],
       });
+      return uname;
     }
+    const data = existing.data() as any;
+    const unameExisting = (data?.username || data?.usernameLower || user.displayName || "").toString();
+    return unameExisting;
   }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -105,17 +111,19 @@ export function SignUpForm() {
       );
       const user = userCredential.user;
 
-      await updateProfile(user, { displayName: values.username });
+  // values.username is already trimmed+lowercased by zod transform
+  await updateProfile(user, { displayName: values.username });
 
-      // ✅ Store user in Firestore
-      await storeUserInFirestore(user, values.username);
+  // ✅ Store user in Firestore (returns final username)
+  const finalUsername = await storeUserInFirestore(user, values.username);
 
       toast({
         title: "Account Created!",
         description: "Welcome to CollabCampus!",
       });
 
-      router.push("/");
+  // Redirect to profile edit page
+  router.push(`/profile/${encodeURIComponent(finalUsername)}`);
       router.refresh();
     } catch (error: any) {
       console.error("Sign up error:", error);
@@ -138,15 +146,15 @@ export function SignUpForm() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      // ✅ Store user in Firestore
-      await storeUserInFirestore(user);
+  // ✅ Store user in Firestore and get final username
+  const finalUsername = await storeUserInFirestore(user);
 
       toast({
         title: "Signed in with Google",
         description: `Welcome, ${user.displayName}`,
       });
 
-      router.push("/");
+  router.push(`/profile/${encodeURIComponent(finalUsername)}`);
       router.refresh();
     } catch (error: any) {
       console.error("Google sign-in error:", error);

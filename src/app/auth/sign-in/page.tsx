@@ -37,15 +37,37 @@ export default function SignInPage() {
   }
 
 
+  function sanitizeUsername(v: string): string {
+    return (v || "").trim().toLowerCase();
+  }
+
   async function handleNewUserSetup(uid: string) {
     setLoading(true);
     try {
+      const uname = sanitizeUsername(username);
+      if (!uname) {
+        showToast("Invalid username", "Username is required.", "destructive");
+        return;
+      }
+      if (/\s/.test(uname)) {
+        showToast("Invalid username", "Username cannot contain spaces.", "destructive");
+        return;
+      }
       await setDoc(doc(db, "users", uid), {
-        username,
+        uid,
+        username: uname,
+        usernameLower: uname,
         email,
+        avatarUrl: "",
+        bio: "",
+        links: [],
+        stats: { posts: 0, followers: 0, following: 0 },
+        badges: [],
+        followers: [],
+        following: [],
         createdAt: new Date(),
       });
-      router.push("/");
+      router.push(`/profile/${encodeURIComponent(uname)}`);
     } catch (error) {
       console.error("Error setting up user:", error);
       showToast("Error", "There was a problem setting up your account.", "destructive");
@@ -66,7 +88,13 @@ export default function SignInPage() {
       if (!userDocSnap.exists()) {
         setNeedsUsername(true);
       } else {
-        router.push("/");
+        const data = userDocSnap.data() as any;
+        const uname = (data?.username || data?.usernameLower || "").toString();
+        if (!uname) {
+          setNeedsUsername(true);
+        } else {
+          router.push(`/profile/${encodeURIComponent(uname)}`);
+        }
       }
     } catch (err) {
       console.error("Email Sign-in error:", err);
@@ -92,13 +120,13 @@ export default function SignInPage() {
                     id="username"
                     placeholder="Enter your username"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase())}
                   />
                 </div>
                 <Button
                   className="w-full"
                   onClick={() => handleNewUserSetup(auth.currentUser?.uid || "")}
-                  disabled={!username || loading}
+                  disabled={!username.trim() || /\s/.test(username) || loading}
                 >
                   {loading ? (
                     <>
