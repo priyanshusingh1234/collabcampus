@@ -33,11 +33,22 @@ export function getIceServers(): IceServer[] {
   if (turnUrls.length && turnUsername && turnCredential) {
     // You can pass multiple TURN urls in a single server entry
     servers.push({ urls: turnUrls, username: turnUsername, credential: turnCredential });
+  } else if (turnUrls.length && (!turnUsername || !turnCredential)) {
+    if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+      console.warn(
+        "WebRTC: NEXT_PUBLIC_TURN_URLS provided but username/credential missing. TURN will be ignored. Set NEXT_PUBLIC_TURN_USERNAME and NEXT_PUBLIC_TURN_CREDENTIAL.",
+      );
+    }
   }
 
   // Sensible defaults if nothing configured
   if (servers.length === 0) {
     servers.push({ urls: ["stun:stun.l.google.com:19302", "stun:global.stun.twilio.com:3478"] });
+    if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+      console.warn(
+        "WebRTC: No STUN/TURN configured. Falling back to public STUN only. For reliable international calls, configure TURN as per docs/webrtc.md.",
+      );
+    }
   }
 
   return servers;

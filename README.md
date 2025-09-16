@@ -48,6 +48,19 @@ CLOUDINARY_API_KEY=...
 CLOUDINARY_API_SECRET=...
 ```
 
+WebRTC voice calling (for international reliability):
+```
+# STUN (optional; falls back to public STUN if omitted)
+NEXT_PUBLIC_STUN_URLS=stun:stun.l.google.com:19302,stun:global.stun.twilio.com:3478
+
+# TURN (recommended for strict NAT/firewalls)
+NEXT_PUBLIC_TURN_URLS=turn:turn.yourdomain.com:3478?transport=udp,turn:turn.yourdomain.com:3478?transport=tcp,turns:turn.yourdomain.com:5349?transport=tcp
+NEXT_PUBLIC_TURN_USERNAME=your_turn_username
+NEXT_PUBLIC_TURN_CREDENTIAL=your_turn_password
+```
+
+See `docs/webrtc.md` for details and best practices.
+
 ## Scripts
 - `npm run dev` – start local development
 - `npm run build` – production build
