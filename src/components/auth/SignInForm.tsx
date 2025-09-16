@@ -32,6 +32,7 @@ export function SignInForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -58,6 +59,7 @@ export function SignInForm() {
     const auth = getAuth();
 
     try {
+      setAuthError(null);
       const userCredential = await signInWithEmailAndPassword(
         auth,
         values.email,
@@ -86,21 +88,25 @@ export function SignInForm() {
       }, 1500);
     } catch (error: any) {
       console.error("Sign in error:", error);
-      let message = "An unexpected error occurred.";
-
-      if (error.code === "auth/user-not-found") {
-        message = "No user found with this email.";
-      } else if (error.code === "auth/wrong-password") {
-        message = "Incorrect password.";
-      } else if (error.code === "auth/too-many-requests") {
-        message = "Too many failed attempts. Try again later.";
+      let message = "Sign in failed. Please check your email and password.";
+      const code: string | undefined = error?.code;
+      switch (code) {
+        case "auth/user-not-found":
+          message = "No user found with this email.";
+          break;
+        case "auth/wrong-password":
+        case "auth/invalid-credential":
+          message = "Incorrect email or password.";
+          break;
+        case "auth/invalid-email":
+          message = "Please enter a valid email address.";
+          break;
+        case "auth/too-many-requests":
+          message = "Too many failed attempts. Try again later.";
+          break;
       }
-
-      toast({
-        variant: "destructive",
-        title: "Sign In Failed",
-        description: message,
-      });
+      setAuthError(message);
+      toast({ variant: "destructive", title: "Sign In Failed", description: message });
     } finally {
       setIsLoading(false);
     }
@@ -110,6 +116,11 @@ export function SignInForm() {
     <div className="space-y-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          {authError ? (
+            <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {authError}
+            </div>
+          ) : null}
           {/* Email Field */}
           <FormField
             control={form.control}
@@ -121,6 +132,10 @@ export function SignInForm() {
                   <Input
                     placeholder="name@example.com"
                     {...field}
+                    onChange={(e) => {
+                      field.onChange(e);
+                      if (authError) setAuthError(null);
+                    }}
                     disabled={isLoading}
                   />
                 </FormControl>
@@ -141,6 +156,10 @@ export function SignInForm() {
                     type="password"
                     placeholder="••••••••"
                     {...field}
+                    onChange={(e) => {
+                      field.onChange(e);
+                      if (authError) setAuthError(null);
+                    }}
                     disabled={isLoading}
                   />
                 </FormControl>
