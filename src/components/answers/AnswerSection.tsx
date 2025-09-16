@@ -482,7 +482,18 @@ export default function AnswerSection({ questionId, questionTitle }: { questionI
               </div>
               
               <div className="prose prose-gray dark:prose-invert max-w-none mb-4">
-                <MentionText text={ans.text || ""} />
+                {(() => {
+                  const raw = ans.text || "";
+                  const looksLikeHtml = /<[^>]+>/.test(raw);
+                  if (!looksLikeHtml) return <MentionText text={raw} />;
+                  let clean = "";
+                  try {
+                    clean = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
+                  } catch {
+                    return <MentionText text={raw} />;
+                  }
+                  return <div dangerouslySetInnerHTML={{ __html: clean }} />;
+                })()}
               </div>
               
               <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
