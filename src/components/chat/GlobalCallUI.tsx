@@ -27,6 +27,8 @@ export default function GlobalCallUI() {
   } | null>(null);
   const [autoAccept, setAutoAccept] = useState(false);
   const unsubRef = useRef<null | (() => void)>(null);
+  const convUnsubsRef = useRef<Array<() => void>>([]);
+  const [usingFallback, setUsingFallback] = useState(false);
 
   // Subscribe to any ringing calls targeting this user
   useEffect(() => {
@@ -36,6 +38,10 @@ export default function GlobalCallUI() {
       unsubRef.current();
       unsubRef.current = null;
     }
+    // Clean fallback subs
+    convUnsubsRef.current.forEach((u) => u());
+    convUnsubsRef.current = [];
+    setUsingFallback(false);
     const cg = collectionGroup(db, "calls");
     const q = query(cg, where("toUid", "==", user.uid));
     const unsub = onSnapshot(q, async (snap) => {
@@ -62,13 +68,78 @@ export default function GlobalCallUI() {
         }
       } catch {}
       setIncoming({ conversationId: convId, callPath: first.path, data: first.data, caller });
+    }, (err) => {
+      // Likely missing collection group index or rules issue; fall back
+      if (typeof window !== "undefined") {
+        console.warn("GlobalCallUI collectionGroup failed; falling back to per-conversation listeners:", err?.message || err);
+      }
+      tryFallback();
     });
     unsubRef.current = unsub;
     return () => {
       unsub();
       unsubRef.current = null;
+      convUnsubsRef.current.forEach((u) => u());
+      convUnsubsRef.current = [];
     };
   }, [user?.uid]);
+
+  // Fallback: subscribe to conversations containing me, then each conversation's calls/current
+  function tryFallback() {
+    if (!user?.uid) return;
+    setUsingFallback(true);
+    // conversations where participantIds array contains me
+    const convsQ = query(collection(db, "conversations"), where("participantIds", "array-contains", user.uid));
+    const unsubConvs = onSnapshot(convsQ, (convSnap) => {
+      // Cleanup existing per-conversation subs
+      convUnsubsRef.current.forEach((u) => u());
+      convUnsubsRef.current = [];
+      const unsubs: Array<() => void> = [];
+      convSnap.docs.forEach((convDoc) => {
+        const convId = convDoc.id;
+        const callDocRef = doc(db, "conversations", convId, "calls", "current");
+        const unsubCall = onSnapshot(callDocRef, async (callSnap) => {
+          if (!callSnap.exists()) {
+            if (incoming?.conversationId === convId) {
+              setIncoming(null);
+              setAutoAccept(false);
+            }
+            return;
+          }
+          const data = callSnap.data() as CallDoc;
+          if (data.toUid !== user.uid || data.status !== "ringing") {
+            if (incoming?.conversationId === convId) {
+              setIncoming(null);
+              setAutoAccept(false);
+            }
+            return;
+          }
+          // fetch caller
+          let caller: BasicUser | undefined = undefined;
+          try {
+            const qs = await getDocs(query(collection(db, "users"), where("uid", "==", data.fromUid)));
+            const doc0 = qs.docs[0];
+            if (doc0) {
+              const d = doc0.data() as any;
+              caller = { uid: d.uid, username: d.username, displayName: d.displayName, avatarUrl: d.avatarUrl };
+            }
+          } catch {}
+          setIncoming({ conversationId: convId, callPath: callDocRef.path, data, caller });
+        }, (err) => {
+          if (typeof window !== "undefined") {
+            console.warn("GlobalCallUI fallback call listener error:", err?.message || err);
+          }
+        });
+        unsubs.push(unsubCall);
+      });
+      convUnsubsRef.current = unsubs;
+    }, (err) => {
+      if (typeof window !== "undefined") {
+        console.warn("GlobalCallUI fallback conversations listener error:", err?.message || err);
+      }
+    });
+    convUnsubsRef.current.push(unsubConvs);
+  }
 
   async function decline() {
     if (!incoming) return;
