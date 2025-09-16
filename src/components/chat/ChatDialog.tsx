@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import * as Icons from "lucide-react";
 import { toast } from "sonner";
 import { useLongPress } from "@/hooks/use-long-press";
+import VoiceCall from "@/components/chat/VoiceCall";
 // Attachment uploads removed
 
 export type ChatDialogProps = {
@@ -34,6 +35,7 @@ export default function ChatDialog({ me, other, open, onOpenChange }: ChatDialog
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState<string>("");
   const [showMenuId, setShowMenuId] = useState<string | null>(null);
+  const blockedState = blocked; // expose for VoiceCall
 
   useEffect(() => {
     if (!open) return;
@@ -178,6 +180,7 @@ export default function ChatDialog({ me, other, open, onOpenChange }: ChatDialog
           <Button variant="ghost" size="icon" onClick={handleToggleBlock} title={blocked.byMe ? "Unblock" : "Block"}>
             {blocked.byMe ? <Icons.UserCheck className="h-5 w-5"/> : <Icons.UserX className="h-5 w-5"/>}
           </Button>
+          <VoiceCall conversationId={conversationId} me={me} other={other} blocked={blocked} compact />
           <Button variant="ghost" size="icon" onClick={() => onOpenChange?.(false)} title="Close">
             <Icons.X className="h-5 w-5"/>
           </Button>

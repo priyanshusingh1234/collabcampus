@@ -17,6 +17,7 @@ import MediaPreviewModal from "./MediaPreviewModal";
 import { useLongPress } from "@/hooks/use-long-press";
 import { isPremium } from "@/lib/premium";
 import { PremiumBadge } from "@/components/ui/PremiumBadge";
+import VoiceCall from "@/components/chat/VoiceCall";
 
 export type ChatPanelProps = {
   me: BasicUser & { uid: string };
@@ -316,7 +317,7 @@ export default function ChatPanel({ me, other, onReady }: ChatPanelProps) {
   return (
     <div className="flex flex-col h-full w-full">
       {/* Header */}
-      <div className="flex items-center gap-3 p-3 border-b">
+  <div className="flex items-center gap-3 p-3 border-b">
         <Avatar className="h-9 w-9 overflow-hidden">
           <img src={other.avatarUrl || ""} className="h-full w-full object-cover" />
           <AvatarFallback>
@@ -349,6 +350,7 @@ export default function ChatPanel({ me, other, onReady }: ChatPanelProps) {
         <Button variant="ghost" size="icon" onClick={handleToggleBlock} title={blocked.byMe ? "Unblock" : "Block"}>
           {blocked.byMe ? <Icons.UserCheck className="h-5 w-5"/> : <Icons.UserX className="h-5 w-5"/>}
         </Button>
+        <VoiceCall conversationId={conversationId} me={me} other={other} blocked={blocked} compact />
       </div>
 
       {/* Messages */}
