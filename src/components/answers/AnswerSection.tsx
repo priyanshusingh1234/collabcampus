@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import DOMPurify from "dompurify"; // For sanitizing rich HTML answers
+import DOMPurify from "dompurify"; // For sanitizing legacy rich HTML answers
 import {
   collection,
   addDoc,
@@ -27,10 +27,10 @@ import { VerifiedTick } from "@/components/ui/VerifiedTick";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
-import { getSuggestedTags } from "@/app/actions";
+// Removed tag suggestions for answers
 import { MentionText } from "@/components/ui/MentionText";
 import { ArrowUpIcon, CheckBadgeIcon } from "@heroicons/react/24/solid";
-import RichTextEditor from "@/components/ui/rich-text";
+// Removed rich text editor; answers will use a plain textarea
 
 interface Answer {
   id: string;
@@ -52,7 +52,7 @@ export default function AnswerSection({ questionId, questionTitle }: { questionI
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
-  const [replyHtml, setReplyHtml] = useState("");
+  const [replyText, setReplyText] = useState("");
   const [loading, setLoading] = useState(true);
   const [qAuthorUid, setQAuthorUid] = useState<string | null>(null);
   const [qAuthorUsername, setQAuthorUsername] = useState<string | null>(null);
@@ -137,7 +137,7 @@ export default function AnswerSection({ questionId, questionTitle }: { questionI
   }, [questionId, currentUser]);
 
   async function submitAnswer() {
-    if (!replyHtml.trim() || !currentUser || isSubmitting) return;
+    if (!replyText.trim() || !currentUser || isSubmitting) return;
     
     setIsSubmitting(true);
 
@@ -165,7 +165,7 @@ export default function AnswerSection({ questionId, questionTitle }: { questionI
       const user = userSnap.docs[0]?.data();
 
       const newAnswer = {
-        text: replyHtml.trim(),
+        text: replyText.trim(),
         createdAt: serverTimestamp(),
         upvotes: 0,
         author: {
@@ -188,28 +188,9 @@ export default function AnswerSection({ questionId, questionTitle }: { questionI
         ...prev,
         { ...newAnswer, id: docRef.id, hasUpvoted: false } as Answer,
       ]);
-      setReplyHtml("");
+      setReplyText("");
 
-      // AI tag suggestion and optional merge into question.tags
-      try {
-        const qSnap = await getDoc(doc(db, "questions", questionId));
-        const qData = qSnap.data() as any;
-        const baseTitle = qData?.title || '';
-        const suggestion = await getSuggestedTags({ text: `${baseTitle}\n\n${replyHtml}`, kind: 'answer', maxTags: 5 });
-        if (suggestion.tags && suggestion.tags.length > 0) {
-          const confirmMerge = typeof window !== 'undefined' ? window.confirm(`Suggest tags for this thread: ${suggestion.tags.join(', ')}\n\nAdd to question tags?`) : false;
-          if (confirmMerge) {
-            const existing = Array.isArray(qData?.tags) ? qData.tags : [];
-            const merged = Array.from(new Set([...(existing as string[]), ...suggestion.tags]));
-            try {
-              await updateDoc(doc(db, "questions", questionId), { tags: merged });
-            } catch {}
-          }
-        }
-      } catch (e) {
-        // non-fatal
-        console.warn('Tag suggestion for answer failed', e);
-      }
+      // Removed: Tag suggestions for answers
 
       // Increment user's answers count and award achievements
       try {
@@ -240,7 +221,7 @@ export default function AnswerSection({ questionId, questionTitle }: { questionI
         const slug = qData?.slug as string | undefined;
         await notifyMentions({
           from: { uid: currentUser.uid, username: user?.username, avatarUrl: user?.avatarUrl },
-          text: replyHtml,
+          text: replyText,
           title: `New answer on: ${qData?.title || "your question"}`,
           url: slug ? `/questions/${slug}` : `/questions/${questionId}`,
         });
@@ -501,29 +482,7 @@ export default function AnswerSection({ questionId, questionTitle }: { questionI
               </div>
               
               <div className="prose prose-gray dark:prose-invert max-w-none mb-4">
-                {(() => {
-                  const raw = ans.text || "";
-                  // Heuristic: if the stored answer contains HTML tags, treat as rich text; otherwise use MentionText for plaintext mentions
-                  const looksLikeHtml = /<[^>]+>/.test(raw);
-                  if (!looksLikeHtml) {
-                    return <MentionText text={raw} />;
-                  }
-                  // Sanitize the HTML to prevent XSS. DOMPurify is run client-side since this is a client component.
-                  let clean = "";
-                  try {
-                    clean = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
-                  } catch (e) {
-                    // Fallback to escaped text if sanitization fails
-                    return <MentionText text={raw} />;
-                  }
-                  // Optional lightweight mention linkifying inside sanitized HTML (avoid touching existing anchors)
-                  const linkified = clean.replace(/(^|[\s>])@([a-zA-Z0-9_]{3,30})\b/g, (m, pre, user) => {
-                    // Skip if already part of an anchor tag (simple containment check)
-                    if (/<a [^>]*?>[^<]*?$/.test(pre)) return m;
-                    return `${pre}<a href="/user/${user}" class="text-blue-600 dark:text-blue-400 hover:underline">@${user}</a>`;
-                  });
-                  return <div dangerouslySetInnerHTML={{ __html: linkified }} />;
-                })()}
+                <MentionText text={ans.text || ""} />
               </div>
               
               <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
@@ -566,14 +525,12 @@ export default function AnswerSection({ questionId, questionTitle }: { questionI
         
         {currentUser ? (
           <div className="space-y-4">
-            <div className="border rounded-lg overflow-hidden shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 dark:border-gray-700">
-              <RichTextEditor
-                value={replyHtml}
-                onChange={setReplyHtml}
-                placeholder="Write your answer here... Use the formatting tools to make it clear and helpful."
-                className="min-h-[200px]"
-              />
-            </div>
+            <Textarea
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              placeholder="Write your answer here..."
+              className="min-h-[160px]"
+            />
             
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
@@ -582,7 +539,7 @@ export default function AnswerSection({ questionId, questionTitle }: { questionI
               
               <Button 
                 onClick={submitAnswer} 
-                disabled={!replyHtml.trim() || isSubmitting}
+                disabled={!replyText.trim() || isSubmitting}
                 className="min-w-[120px]"
               >
                 {isSubmitting ? (
