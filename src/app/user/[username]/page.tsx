@@ -390,10 +390,13 @@ export default function PublicUserProfile() {
             </Avatar>
           </div>
         </div>
-        <div className="flex items-center gap-4 flex-wrap justify-center">
+  <div className="flex items-center gap-4 flex-wrap justify-center">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             {userData.displayName || userData.username}
             {userData.verified && <VerifiedTick size={16} />}
+            {otherPresence?.state === "online" && (
+              <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold">Online</span>
+            )}
           </h1>
           <span className="text-base text-gray-500 dark:text-gray-400">@{userData.username}</span>
           {typeof rank === 'number' && rank > 0 && (

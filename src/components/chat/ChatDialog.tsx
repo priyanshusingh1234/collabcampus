@@ -88,7 +88,7 @@ export default function ChatDialog({ me, other, open, onOpenChange }: ChatDialog
   // Subscribe to other user's presence
   useEffect(() => {
     if (!open) return;
-    const unsub = subscribePresence(other.uid, (p) => setPresence(p));
+  const unsub = subscribePresence(other.uid, (p) => setPresence(p));
     return () => unsub && unsub();
   }, [open, other.uid]);
 
@@ -240,12 +240,15 @@ export default function ChatDialog({ me, other, open, onOpenChange }: ChatDialog
                           try {
                             if (m.senderId !== me.uid) {
                               toast.error("You can only delete your own messages");
-                              return;
-                            }
-                            const att = (m as any)?.attachment;
-                            if (att?.provider === "cloudinary" && att?.publicId) {
-                              const rt = att.resourceType === "image" || att.resourceType === "video" || att.resourceType === "raw" ? att.resourceType : undefined;
-                              await fetch("/api/cloudinary-delete", {
+                              return (
+                                <div className="flex items-center gap-2">
+                                  {/* ...existing code... */}
+                                  <span className="text-xs text-muted-foreground">{other.displayName || other.username}</span>
+                                  {presence?.state === "online" && (
+                                    <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-semibold">Online</span>
+                                  )}
+                                </div>
+                              );
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ public_id: att.publicId, resource_type: rt }),

@@ -115,7 +115,7 @@ export default function ChatPanel({ me, other, onReady }: ChatPanelProps) {
   }, [conversationId, me.uid, other.uid, premium]);
 
   useEffect(() => {
-    const unsub = subscribePresence(other.uid, (p) => setPresence(p));
+  const unsub = subscribePresence(other.uid, (p) => setPresence(p));
     return () => unsub && unsub();
   }, [other.uid]);
 
@@ -463,12 +463,15 @@ export default function ChatPanel({ me, other, onReady }: ChatPanelProps) {
                         try {
                           if (m.senderId !== me.uid) {
                             toast.error("You can only delete your own messages");
-                            return;
-                          }
-                          // If this message has a Cloudinary attachment, delete it first
-                          const att = m?.attachment;
-                          if (att?.provider === "cloudinary" && att?.publicId) {
-                            const rt = att.resourceType === "image" || att.resourceType === "video" || att.resourceType === "raw" ? att.resourceType : undefined;
+                            return (
+                              <div className="flex items-center gap-2">
+                                {/* ...existing code... */}
+                                <span className="text-xs text-muted-foreground">{other.displayName || other.username}</span>
+                                {presence?.state === "online" && (
+                                  <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-semibold">Online</span>
+                                )}
+                              </div>
+                            );
                             await fetch("/api/cloudinary-delete", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
