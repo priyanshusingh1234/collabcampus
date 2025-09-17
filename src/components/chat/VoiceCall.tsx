@@ -37,6 +37,15 @@ type CallDoc = {
   endReason?: string;
 };
 
+export type VoiceCallHandle = {
+  accept: () => Promise<void>;
+  decline: () => Promise<void>;
+  hangup: () => Promise<void>;
+  toggleMute: () => void;
+  setSpeaker: (on: boolean) => Promise<boolean>;
+  getState: () => { micMuted: boolean; connected: boolean; status: CallDoc["status"] | null };
+} | null;
+
 export function VoiceCall({
   conversationId,
   me,
@@ -45,6 +54,8 @@ export function VoiceCall({
   compact = false,
   autoAccept = false,
   hideInlineControls = false,
+  onState,
+  controlsRef,
 }: {
   conversationId: string;
   me: BasicUser & { uid: string };
@@ -53,6 +64,8 @@ export function VoiceCall({
   compact?: boolean; // when true, render only the icon button; banners render inline when active
   autoAccept?: boolean; // when true and an inbound ringing call exists, auto-accept
   hideInlineControls?: boolean; // suppress inline banners/controls (used by GlobalCallUI host)
+  onState?: (s: { status: CallDoc["status"] | null; connected: boolean; micMuted: boolean }) => void;
+  controlsRef?: React.MutableRefObject<VoiceCallHandle>;
 }) {
   const callRef = useMemo(() => doc(db, "conversations", conversationId, "calls", "current"), [conversationId]);
   const callerCandidatesRef = useMemo(() => collection(db, "conversations", conversationId, "calls", "current", "callerCandidates"), [conversationId]);
@@ -63,6 +76,7 @@ export function VoiceCall({
   const [inbound, setInbound] = useState(false);
   const [connected, setConnected] = useState(false);
   const [micMuted, setMicMuted] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(false);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
@@ -81,9 +95,11 @@ export function VoiceCall({
           // remote ended
           cleanupPeer("Remote ended");
         }
+        onState?.({ status: data.status, connected, micMuted });
       } else {
         setInbound(false);
         setConnected(false);
+        onState?.({ status: null, connected: false, micMuted });
       }
     });
     return () => unsub();
@@ -130,6 +146,7 @@ export function VoiceCall({
     pc.onconnectionstatechange = () => {
       const st = pc.connectionState;
       setConnected(st === "connected");
+      onState?.({ status: call?.status ?? null, connected: st === "connected", micMuted });
       if (st === "failed" || st === "disconnected" || st === "closed") {
         // let the other side know
         updateDoc(callRef, { status: "ended", endedAt: serverTimestamp(), endReason: st, updatedAt: serverTimestamp() }).catch(() => {});
@@ -309,7 +326,52 @@ export function VoiceCall({
     const next = !micMuted;
     stream.getAudioTracks().forEach((t) => (t.enabled = !next));
     setMicMuted(next);
+    onState?.({ status: call?.status ?? null, connected, micMuted: next });
   }, [micMuted]);
+
+  // Attempt to switch audio output device to speaker if supported
+  const setSpeaker = useCallback(async (on: boolean): Promise<boolean> => {
+    try {
+      const el = remoteAudioRef.current as any;
+      if (!el || typeof el.setSinkId !== "function") {
+        setSpeakerOn(on);
+        return false;
+      }
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const outs = devices.filter((d) => d.kind === "audiooutput");
+      if (!outs.length) {
+        setSpeakerOn(on);
+        return false;
+      }
+      let target = outs[0];
+      if (on) {
+        const speaker = outs.find((d) => /speaker/i.test(d.label));
+        if (speaker) target = speaker;
+      }
+      await el.setSinkId(target.deviceId);
+      setSpeakerOn(on);
+      return true;
+    } catch {
+      setSpeakerOn(on);
+      return false;
+    }
+  }, []);
+
+  // Expose controls to parent via ref
+  useEffect(() => {
+    if (!controlsRef) return;
+    controlsRef.current = {
+      accept: acceptCall,
+      decline: declineCall,
+      hangup: endCall,
+      toggleMute,
+      setSpeaker,
+      getState: () => ({ micMuted, connected, status: call?.status ?? null }),
+    };
+    return () => {
+      controlsRef.current = null;
+    };
+  }, [acceptCall, declineCall, endCall, toggleMute, setSpeaker, micMuted, connected, call?.status]);
 
   const canStart = !blocked?.byMe && !blocked?.byOther && (!call || call.status === "ended");
 

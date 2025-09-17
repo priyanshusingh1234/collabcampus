@@ -5,7 +5,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { collectionGroup, doc, onSnapshot, query, updateDoc, where, getDocs, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getConversationId, type BasicUser } from "@/lib/chat";
-import VoiceCall from "@/components/chat/VoiceCall";
+import VoiceCall, { type VoiceCallHandle } from "@/components/chat/VoiceCall";
 import { Button } from "@/components/ui/button";
 import * as Icons from "lucide-react";
 
@@ -29,6 +29,10 @@ export default function GlobalCallUI() {
   const unsubRef = useRef<null | (() => void)>(null);
   const convUnsubsRef = useRef<Array<() => void>>([]);
   const [usingFallback, setUsingFallback] = useState(false);
+  const vcRef = useRef<VoiceCallHandle>(null);
+  const [callUi, setCallUi] = useState<{ status: CallDoc["status"] | null; connected: boolean; micMuted: boolean }>({ status: null, connected: false, micMuted: false });
+  const [callStartTs, setCallStartTs] = useState<number | null>(null);
+  const [speakerOn, setSpeakerOn] = useState(false);
 
   // Subscribe to any ringing calls targeting this user
   useEffect(() => {
@@ -157,6 +161,7 @@ export default function GlobalCallUI() {
     } catch {}
     setIncoming(null);
     setAutoAccept(false);
+    setCallStartTs(null);
   }
 
   if (!incoming || !user) return null;
@@ -170,6 +175,21 @@ export default function GlobalCallUI() {
   const other: BasicUser & { uid: string } = incoming.caller || { uid: incoming.data.fromUid } as any;
 
   const isRinging = incoming.data.status === "ringing";
+  const inCall = !isRinging && incoming.data.status !== "ended";
+
+  function onStateUpdate(s: { status: CallDoc["status"] | null; connected: boolean; micMuted: boolean }) {
+    setCallUi(s);
+    if ((s.status === "accepted" || s.connected) && !callStartTs) {
+      setCallStartTs(Date.now());
+    }
+    if (s.status === null) {
+      setCallStartTs(null);
+    }
+  }
+
+  const elapsed = callStartTs ? Math.floor((Date.now() - callStartTs) / 1000) : 0;
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
+  const ss = String(elapsed % 60).padStart(2, "0");
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80">
@@ -182,12 +202,14 @@ export default function GlobalCallUI() {
           compact
           autoAccept={autoAccept}
           hideInlineControls
+          controlsRef={vcRef}
+          onState={onStateUpdate}
         />
       </div>
 
       <div className="w-full max-w-sm mx-auto px-6">
         <div className="flex flex-col items-center gap-6 text-white">
-          <div className="mt-6 text-sm uppercase tracking-wide opacity-80">Incoming call</div>
+          {!inCall && <div className="mt-6 text-sm uppercase tracking-wide opacity-80">Incoming call</div>}
           <div className="h-24 w-24 rounded-full overflow-hidden ring-4 ring-white/20 shadow-lg">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={other.avatarUrl || "/favicon.ico"} alt="avatar" className="h-full w-full object-cover" />
@@ -195,29 +217,51 @@ export default function GlobalCallUI() {
           <div className="text-2xl font-semibold text-center">
             {other.displayName || other.username || "Unknown"}
           </div>
-          <div className="mt-8 flex items-center justify-between w-full">
-            <div className="flex flex-col items-center gap-3">
-              <Button size="icon" className="h-16 w-16 rounded-full bg-red-600 hover:bg-red-700" onClick={decline}>
-                <Icons.PhoneOff className="h-7 w-7" />
-              </Button>
-              <div className="text-xs opacity-80">Decline</div>
+
+          {/* Ringing controls */}
+          {isRinging && (
+            <div className="mt-8 flex items-center justify-between w-full">
+              <div className="flex flex-col items-center gap-3">
+                <Button size="icon" className="h-16 w-16 rounded-full bg-red-600 hover:bg-red-700" onClick={decline}>
+                  <Icons.PhoneOff className="h-7 w-7" />
+                </Button>
+                <div className="text-xs opacity-80">Decline</div>
+              </div>
+              <div className="flex flex-col items-center gap-3">
+                <Button
+                  size="icon"
+                  className="h-16 w-16 rounded-full bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => setAutoAccept(true)}
+                >
+                  <Icons.Phone className="h-7 w-7 rotate-90" />
+                </Button>
+                <div className="text-xs opacity-80">Accept</div>
+              </div>
             </div>
-            <div className="flex flex-col items-center gap-3">
-              <Button
-                size="icon"
-                className="h-16 w-16 rounded-full bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => setAutoAccept(true)}
-              >
-                <Icons.Phone className="h-7 w-7 rotate-90" />
-              </Button>
-              <div className="text-xs opacity-80">Accept</div>
-            </div>
-          </div>
-          {!isRinging && (
-            <div className="mt-6 flex items-center gap-4">
-              <Button variant="secondary" onClick={hangup}>
-                <Icons.PhoneOff className="h-4 w-4 mr-2" /> Hang up
-              </Button>
+          )}
+
+          {/* In-call controls for mobile */}
+          {inCall && (
+            <div className="mt-6 w-full flex flex-col items-center gap-4">
+              <div className="text-sm opacity-80">{callUi.connected ? `${mm}:${ss}` : (incoming.data.status || "connecting…")}</div>
+              <div className="grid grid-cols-3 gap-6 w-full max-w-xs">
+                <Button variant="secondary" className="h-14 rounded-full flex flex-col items-center justify-center" onClick={() => vcRef.current?.toggleMute()}>
+                  {callUi.micMuted ? <Icons.MicOff className="h-5 w-5" /> : <Icons.Mic className="h-5 w-5" />}
+                  <span className="mt-1 text-[11px]">{callUi.micMuted ? "Unmute" : "Mute"}</span>
+                </Button>
+                <Button variant="destructive" className="h-14 rounded-full flex flex-col items-center justify-center" onClick={hangup}>
+                  <Icons.PhoneOff className="h-5 w-5" />
+                  <span className="mt-1 text-[11px]">Hang up</span>
+                </Button>
+                <Button variant="secondary" className="h-14 rounded-full flex flex-col items-center justify-center" onClick={async () => {
+                  const next = !speakerOn;
+                  const ok = await (vcRef.current?.setSpeaker?.(next) ?? Promise.resolve(false));
+                  setSpeakerOn(next);
+                }}>
+                  <Icons.Volume2 className="h-5 w-5" />
+                  <span className="mt-1 text-[11px]">{speakerOn ? "Earpiece" : "Speaker"}</span>
+                </Button>
+              </div>
             </div>
           )}
         </div>
