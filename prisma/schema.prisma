@@ -1,0 +1,19 @@
+// Prisma schema for optional PostgreSQL presence store
+// This lets you run presence without Firebase if you set NEXT_PUBLIC_USE_PG_PRESENCE=true
+// and provide a DATABASE_URL pointing to your Postgres instance.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Presence {
+  uid        String   @id
+  state      String   // "online" | "offline"
+  lastActive DateTime?
+  updatedAt  DateTime @updatedAt
+}

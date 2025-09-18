@@ -1,4 +1,4 @@
-import { doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export type PresenceDoc = {
@@ -19,7 +19,20 @@ export async function setOnline(uid: string) {
 
 export async function heartbeat(uid: string) {
   const ref = presenceRef(uid);
-  await updateDoc(ref, { state: "online", lastActive: serverTimestamp(), updatedAt: serverTimestamp() });
+  await setDoc(
+    ref,
+    { uid, state: "online", lastActive: serverTimestamp(), updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+}
+
+export async function setOffline(uid: string) {
+  try {
+    const ref = presenceRef(uid);
+    await setDoc(ref, { uid, state: "offline", updatedAt: serverTimestamp() }, { merge: true });
+  } catch {
+    // best effort
+  }
 }
 
 export function subscribePresence(uid: string, cb: (doc: PresenceDoc | null) => void) {

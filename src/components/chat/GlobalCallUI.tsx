@@ -174,8 +174,8 @@ export default function GlobalCallUI() {
   };
   const other: BasicUser & { uid: string } = incoming.caller || { uid: incoming.data.fromUid } as any;
 
-  const isRinging = incoming.data.status === "ringing";
-  const inCall = !isRinging && incoming.data.status !== "ended";
+  const isRinging = incoming.data.status === "ringing" && !callUi.connected;
+  const inCall = callUi.status === "accepted" || callUi.connected;
 
   function onStateUpdate(s: { status: CallDoc["status"] | null; connected: boolean; micMuted: boolean }) {
     setCallUi(s);
@@ -183,7 +183,10 @@ export default function GlobalCallUI() {
       setCallStartTs(Date.now());
     }
     if (s.status === null) {
+      // Call doc disappeared, close overlay
       setCallStartTs(null);
+      setIncoming(null);
+      setAutoAccept(false);
     }
   }
 

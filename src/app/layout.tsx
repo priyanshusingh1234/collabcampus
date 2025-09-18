@@ -7,6 +7,7 @@ import { AuthProvider } from '@/components/auth/AuthProvider';
 import Footer from '@/components/layout/Footer';
 import './globals.css';
 import GlobalCallUI from '@/components/chat/GlobalCallUI';
+import PresenceWatcher from '@/components/presence/PresenceWatcher';
 
 export const metadata: Metadata = {
   title: 'Manthan – Ignite Curiosity, Build Together',
@@ -45,6 +46,8 @@ export default function RootLayout({
             <Footer />
             {/* Global full-screen incoming call UI */}
             <GlobalCallUI />
+            {/* Presence heartbeat */}
+            <PresenceWatcher />
           </div>
           <Toaster />
         </AuthProvider>

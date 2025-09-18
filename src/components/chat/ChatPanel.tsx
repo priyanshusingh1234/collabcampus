@@ -463,15 +463,11 @@ export default function ChatPanel({ me, other, onReady }: ChatPanelProps) {
                         try {
                           if (m.senderId !== me.uid) {
                             toast.error("You can only delete your own messages");
-                            return (
-                              <div className="flex items-center gap-2">
-                                {/* ...existing code... */}
-                                <span className="text-xs text-muted-foreground">{other.displayName || other.username}</span>
-                                {presence?.state === "online" && (
-                                  <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-semibold">Online</span>
-                                )}
-                              </div>
-                            );
+                            return;
+                          }
+                          const att = (m as any)?.attachment;
+                          if (att?.provider === "cloudinary" && att?.publicId) {
+                            const rt = att.resourceType === "image" || att.resourceType === "video" || att.resourceType === "raw" ? att.resourceType : undefined;
                             await fetch("/api/cloudinary-delete", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
