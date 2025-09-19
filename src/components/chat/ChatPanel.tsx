@@ -317,7 +317,7 @@ export default function ChatPanel({ me, other, onReady }: ChatPanelProps) {
   return (
     <div className="flex flex-col h-full w-full">
       {/* Header */}
-  <div className="flex items-center gap-3 p-3 border-b">
+  <div className="flex items-center gap-3 p-3 border-b sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <Avatar className="h-9 w-9 overflow-hidden">
           <img src={other.avatarUrl || ""} className="h-full w-full object-cover" />
           <AvatarFallback>
@@ -353,8 +353,8 @@ export default function ChatPanel({ me, other, onReady }: ChatPanelProps) {
         <VoiceCall conversationId={conversationId} me={me} other={other} blocked={blocked} compact />
       </div>
 
-      {/* Messages */}
-      <div ref={listRef} className="flex-1 overflow-y-auto p-3 bg-muted/30">
+  {/* Messages */}
+  <div ref={listRef} className="flex-1 overflow-y-auto p-3 bg-muted/30">
     {messages.map((m, i) => {
           const mine = m.senderId === me.uid;
           const time = m.createdAt?.toDate ? m.createdAt.toDate() : null;
@@ -574,8 +574,8 @@ export default function ChatPanel({ me, other, onReady }: ChatPanelProps) {
         })}
       </div>
 
-      {/* Composer */}
-  <div className="p-3 border-t flex items-center gap-2">
+    {/* Composer */}
+  <div className="p-3 border-t flex items-center gap-2 sticky bottom-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         {pickedPreview ? (
           <>
             <AttachmentButton deferred onPicked={onFilePicked} disabled title="Attach" />

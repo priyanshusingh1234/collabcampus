@@ -84,6 +84,7 @@ export function VoiceCall({
   const myRoleRef = useRef<"caller" | "callee" | null>(null);
   const iceUnsubsRef = useRef<Array<() => void>>([]);
   const acceptedOnceRef = useRef(false);
+  const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(callRef, (snap) => {
@@ -147,10 +148,42 @@ export function VoiceCall({
       const st = pc.connectionState;
       setConnected(st === "connected");
       onState?.({ status: call?.status ?? null, connected: st === "connected", micMuted });
-      if (st === "failed" || st === "disconnected" || st === "closed") {
-        // let the other side know
+      if (st === "failed") {
+        // End immediately on hard failure
         updateDoc(callRef, { status: "ended", endedAt: serverTimestamp(), endReason: st, updatedAt: serverTimestamp() }).catch(() => {});
         cleanupPeer(`Peer ${st}`);
+      } else if (st === "disconnected") {
+        // Grace period: transient network blips are common on mobile
+        if (disconnectTimerRef.current) clearTimeout(disconnectTimerRef.current);
+        disconnectTimerRef.current = setTimeout(() => {
+          if (pc.connectionState === "disconnected") {
+            updateDoc(callRef, { status: "ended", endedAt: serverTimestamp(), endReason: "timeout", updatedAt: serverTimestamp() }).catch(() => {});
+            cleanupPeer("Peer disconnected timeout");
+          }
+        }, 5000);
+      } else if (st === "connected") {
+        if (disconnectTimerRef.current) { clearTimeout(disconnectTimerRef.current); disconnectTimerRef.current = null; }
+      } else if (st === "closed") {
+        cleanupPeer("Peer closed");
+      }
+    };
+
+    // Some browsers only fire iceconnectionstatechange for detailed ICE states
+    pc.oniceconnectionstatechange = () => {
+      const st = pc.iceConnectionState;
+      if (st === "failed") {
+        updateDoc(callRef, { status: "ended", endedAt: serverTimestamp(), endReason: `ice_${st}`, updatedAt: serverTimestamp() }).catch(() => {});
+        cleanupPeer("ICE failed");
+      } else if (st === "disconnected") {
+        if (disconnectTimerRef.current) clearTimeout(disconnectTimerRef.current);
+        disconnectTimerRef.current = setTimeout(() => {
+          if (pc.iceConnectionState === "disconnected") {
+            updateDoc(callRef, { status: "ended", endedAt: serverTimestamp(), endReason: `ice_timeout`, updatedAt: serverTimestamp() }).catch(() => {});
+            cleanupPeer("ICE disconnected timeout");
+          }
+        }, 5000);
+      } else if (st === "connected" || st === "completed") {
+        if (disconnectTimerRef.current) { clearTimeout(disconnectTimerRef.current); disconnectTimerRef.current = null; }
       }
     };
     pcRef.current = pc;
@@ -293,6 +326,7 @@ export function VoiceCall({
   function cleanupPeer(reason?: string) {
     iceUnsubsRef.current.forEach((u) => u());
     iceUnsubsRef.current = [];
+    if (disconnectTimerRef.current) { clearTimeout(disconnectTimerRef.current); disconnectTimerRef.current = null; }
     const pc = pcRef.current;
     if (pc) {
       try { pc.ontrack = null; } catch {}

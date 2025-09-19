@@ -2,13 +2,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { MentionText } from "@/components/ui/MentionText";
-import { CheckBadgeIcon, HeartIcon, ChatBubbleLeftIcon, BookmarkIcon, EllipsisHorizontalIcon, ArrowPathRoundedSquareIcon } from "@heroicons/react/24/solid";
+import { CheckBadgeIcon, HeartIcon, ChatBubbleLeftIcon, BookmarkIcon, EllipsisHorizontalIcon, ArrowPathRoundedSquareIcon, TrashIcon } from "@heroicons/react/24/solid";
 import { HeartIcon as HeartOutline, BookmarkIcon as BookmarkOutline, ChatBubbleLeftIcon as ChatOutline } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getAuth } from "firebase/auth";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, deleteDoc, updateDoc, increment, collection, query, where, getDocs, updateDoc as updateUserDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, updateDoc, increment, collection, query, where, getDocs, arrayUnion, arrayRemove } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 export interface MomentDoc {
@@ -36,6 +36,8 @@ export function MomentCard({ m }: { m: MomentDoc }) {
   const [likesCount, setLikesCount] = useState(m.likesCount || 0);
   const [busyLike, setBusyLike] = useState(false);
   const [busySave, setBusySave] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
 
   // Load initial like + favorite state
   useEffect(() => {
@@ -56,6 +58,7 @@ export function MomentCard({ m }: { m: MomentDoc }) {
         if (profile?.favoriteMoments && Array.isArray(profile.favoriteMoments) && profile.favoriteMoments.includes(m.id)) {
           if (!cancelled) setIsSaved(true);
         }
+        if (!cancelled) setIsOwner(m.authorId === user.uid || !!profile?.isAdmin);
       } catch {}
     })();
     return () => { cancelled = true; };
@@ -84,6 +87,24 @@ export function MomentCard({ m }: { m: MomentDoc }) {
       setLikesCount(c => c + (optimistic ? -1 : 1));
       toast({ variant: 'destructive', title: 'Unable to update like' });
     } finally { setBusyLike(false); }
+  }
+
+  async function handleDeleteMoment() {
+    if (!user) { toast({ title: 'Sign in required' }); return; }
+    if (!isOwner) { toast({ variant: 'destructive', title: 'Not allowed' }); return; }
+    if (!confirm('Delete this moment permanently?')) return;
+    setDeleting(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/moments/${encodeURIComponent(m.id)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to delete');
+      toast({ title: 'Moment deleted' });
+      // Optionally, emit an event or rely on feed snapshot to disappear
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Delete failed', description: e?.message });
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function handleSave() {
@@ -148,9 +169,16 @@ export function MomentCard({ m }: { m: MomentDoc }) {
             </span>
           </div>
         </Link>
-        <Button variant="ghost" size="icon" className="ml-auto h-8 w-8 rounded-full">
-          <EllipsisHorizontalIcon className="h-5 w-5" />
-        </Button>
+        <div className="ml-auto flex items-center gap-1">
+          {isOwner && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-red-600" onClick={handleDeleteMoment} disabled={deleting} title="Delete moment">
+              <TrashIcon className="h-5 w-5" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+            <EllipsisHorizontalIcon className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       {/* Media */}

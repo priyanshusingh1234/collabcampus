@@ -14,7 +14,8 @@
     "cap:sync": "cap sync",
     "cap:android:add": "cap add android",
     "cap:android:open": "cap open android",
-    "cap:doctor": "cap doctor"
+    "cap:doctor": "cap doctor",
+    "backup": "powershell -ExecutionPolicy Bypass -File ./scripts/backup.ps1"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",
