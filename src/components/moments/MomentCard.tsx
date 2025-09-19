@@ -28,6 +28,8 @@ export interface MomentDoc {
 
 export function MomentCard({ m }: { m: MomentDoc }) {
   const first = m.media?.[0];
+  const [idx, setIdx] = useState(0);
+  const hasMany = Array.isArray(m.media) && m.media.length > 1;
   const auth = getAuth();
   const user = auth.currentUser;
   const { toast } = useToast();
@@ -183,14 +185,52 @@ export function MomentCard({ m }: { m: MomentDoc }) {
 
       {/* Media */}
       {first && (
-        <Link href={`/moments/${m.id}`} className="relative bg-black aspect-square w-full block overflow-hidden group">
-          <img 
-            src={first.url} 
-            alt={m.caption || 'moment'} 
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-          />
-          <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
-        </Link>
+        <div className="relative bg-black aspect-square w-full overflow-hidden">
+          {hasMany ? (
+            <div className="relative h-full w-full">
+              <div className="h-full w-full flex overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar" onScroll={(e) => {
+                const el = e.currentTarget;
+                const n = Math.round(el.scrollLeft / el.clientWidth);
+                if (n !== idx) setIdx(Math.max(0, Math.min(n, (m.media?.length || 1) - 1)));
+              }}>
+                {m.media!.map((mm, i) => (
+                  <a key={i} href={`/moments/${m.id}`} className="relative min-w-full h-full snap-center block">
+                    <img src={mm.url} alt={m.caption || 'moment'} className="w-full h-full object-cover" />
+                  </a>
+                ))}
+              </div>
+              {/* Arrows */}
+              <button aria-label="Prev" className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white text-black rounded-full h-8 w-8 flex items-center justify-center" onClick={() => {
+                const next = Math.max(0, idx - 1);
+                setIdx(next);
+                const scroller = (event?.currentTarget as any)?.parentElement?.querySelector('.no-scrollbar');
+                if (scroller) scroller.scrollTo({ left: next * scroller.clientWidth, behavior: 'smooth' });
+              }}>‹</button>
+              <button aria-label="Next" className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white text-black rounded-full h-8 w-8 flex items-center justify-center" onClick={() => {
+                const max = (m.media?.length || 1) - 1;
+                const next = Math.min(max, idx + 1);
+                setIdx(next);
+                const scroller = (event?.currentTarget as any)?.parentElement?.querySelector('.no-scrollbar');
+                if (scroller) scroller.scrollTo({ left: next * scroller.clientWidth, behavior: 'smooth' });
+              }}>›</button>
+              {/* Dots */}
+              <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1">
+                {m.media!.map((_, i) => (
+                  <button key={i} aria-label={`Go to image ${i + 1}`} className={`h-1.5 rounded-full transition-all ${i === idx ? 'w-6 bg-white' : 'w-2 bg-white/60'}`} onClick={(e) => {
+                    const scroller = (e.currentTarget as any).closest('.relative')?.querySelector('.no-scrollbar');
+                    if (scroller) scroller.scrollTo({ left: i * scroller.clientWidth, behavior: 'smooth' });
+                    setIdx(i);
+                  }}/>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <Link href={`/moments/${m.id}`} className="relative bg-black aspect-square w-full block overflow-hidden group">
+              <img src={first.url} alt={m.caption || 'moment'} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+              <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
+            </Link>
+          )}
+        </div>
       )}
 
       {/* Actions */}

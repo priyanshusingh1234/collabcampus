@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { addDoc, collection, serverTimestamp, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, orderBy, onSnapshot, limit, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { getAuth } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
@@ -26,27 +26,60 @@ export function MomentComments({ momentId, author }: { momentId: string; author?
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const mention = useMentionSuggestions(text);
+  const [profileByUid, setProfileByUid] = useState<Record<string, { username?: string; avatarUrl?: string; verified?: boolean }>>({});
 
   useEffect(() => {
     const ref = collection(db, 'moments', momentId, 'comments');
     const q = query(ref, orderBy('createdAt', 'desc'), limit(50));
     const unsub = onSnapshot(q, (snap) => {
-      setComments(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      const arr = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+      setComments(arr);
+      // Load missing avatars/usernames for commenters if needed
+      const missing = Array.from(
+        new Set(
+          arr.filter(c => !c.avatarUrl).map(c => c.authorId).filter(Boolean)
+        )
+      ).filter(uid => !profileByUid[uid]);
+      if (missing.length) {
+        (async () => {
+          try {
+            // Firestore 'in' supports up to 10 per chunk
+            const chunks: string[][] = [];
+            for (let i = 0; i < missing.length; i += 10) chunks.push(missing.slice(i, i + 10));
+            const found: Record<string, { username?: string; avatarUrl?: string; verified?: boolean }> = {};
+            for (const ids of chunks) {
+              const qs = await getDocs(query(collection(db, 'users'), where('uid', 'in', ids)));
+              qs.docs.forEach(d => {
+                const u = d.data() as any;
+                if (u?.uid) found[u.uid] = { username: u.username, avatarUrl: u.avatarUrl, verified: !!u.verified };
+              });
+            }
+            if (Object.keys(found).length) setProfileByUid(prev => ({ ...prev, ...found }));
+          } catch {
+            // ignore failures; fallback avatars will render
+          }
+        })();
+      }
     });
     return () => unsub();
-  }, [momentId]);
+  }, [momentId, profileByUid]);
+
+  async function ensureProfile(uid: string) {
+    try {
+      const qs = await getDocs(query(collection(db, 'users'), where('uid', '==', uid)));
+      const d = qs.docs[0]?.data();
+      return d as any;
+    } catch {
+      return null;
+    }
+  }
 
   async function handleSubmit() {
     const user = auth.currentUser;
     if (!user || !text.trim() || submitting) return;
     setSubmitting(true);
     try {
-      const userSnap = await import('@/lib/firebase').then(m => m.db); // placeholder ensure module loaded
-      // For simplicity we assume username stored on moment comment author requires a query in real scenario.
-      // TODO: optimize by caching current profile.
-      const profileRes = await fetch('/api/user/profile'); // optional future endpoint
-      let profile: any = undefined;
-      if (profileRes.ok) { try { profile = await profileRes.json(); } catch {} }
+      const profile = await ensureProfile(user.uid);
       const comment = {
         authorId: user.uid,
         username: profile?.username || user.displayName || 'user',
